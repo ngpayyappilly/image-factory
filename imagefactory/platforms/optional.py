@@ -1,4 +1,5 @@
-"""Optional platforms: Azure, GCP, VMware.
+"""Optional platforms with Packer variable mapping only: GCP, VMware.
+(Azure has a full runtime plugin: see azure.py.)
 
 Packer variable mapping is real and `packer validate`-able. Channel projection, availability
 checks and retention are NOT implemented yet; they raise PlatformNotImplemented rather than
@@ -7,26 +8,6 @@ silently doing nothing, so enabling one of these in config fails loudly at promo
 from __future__ import annotations
 
 from .base import UnimplementedRuntime
-
-
-class AzurePlatform(UnimplementedRuntime):
-    name = "azure"
-    packer_source = "azure-arm"
-
-    def packer_vars(self, flavor_cfg, version):
-        a, c = flavor_cfg["azure"], self.config
-        return {
-            "azure_subscription_id": c["subscription_id"],
-            "azure_build_resource_group": c["build_resource_group"],
-            "azure_gallery_resource_group": c["gallery_resource_group"],
-            "azure_gallery_name": c["gallery_name"],
-            "azure_replication_regions": c["replication_regions"],
-            "azure_image_publisher": a["publisher"],
-            "azure_image_offer": a["offer"],
-            "azure_image_sku": a["sku"],
-            "azure_vm_size": a.get("vm_size", "Standard_D2s_v5"),
-            "azure_image_version": version.azure,
-        }
 
 
 class GcpPlatform(UnimplementedRuntime):

@@ -24,8 +24,10 @@ class Platform(ABC):
         """Map config/images.yaml onto this platform's Packer variables."""
 
     @abstractmethod
-    def images_from_packer(self, artifact_id: str) -> Dict[str, str]:
-        """Parse a Packer manifest artifact_id into {location: image reference}."""
+    def images_from_packer(self, artifact_id: str, flavor: str, version: Version) -> Dict[str, str]:
+        """The {location: image reference} a finished build produced. `artifact_id` is Packer's manifest
+        value; platforms whose references are deterministic (Azure, GCP) may derive them from config,
+        flavor and version instead of parsing it."""
 
     @abstractmethod
     def verify_available(self, version: Version, images: Dict[str, str]) -> List[str]:
@@ -55,7 +57,7 @@ class UnimplementedRuntime(Platform):
             % (self.name, op)
         )
 
-    def images_from_packer(self, artifact_id):
+    def images_from_packer(self, artifact_id, flavor, version):
         self._no("images_from_packer")
 
     def verify_available(self, version, images):

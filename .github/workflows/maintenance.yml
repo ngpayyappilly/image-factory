@@ -35,6 +35,13 @@ jobs:
         with:
           role-to-assume: ${{ vars.PROMOTER_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+      - name: Sign in to Azure (promoter identity)
+        if: ${{ vars.AZURE_TENANT_ID != '' }}       # only when Azure is set up (terraform/azure-bootstrap)
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_PROMOTER_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Retention
         env:
           EVENT: ${{ github.event_name }}

@@ -8,6 +8,9 @@
 #   IMAGEFACTORY_RUNNER (optional)            runner label; default ubuntu-24.04 (pinned, bump deliberately). Use a self-hosted label
 #                                             for builds inside a private network.
 #   PACKER_VERSION (optional)                 pin Packer; default latest
+#   AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID, AZURE_BUILDER_CLIENT_ID, AZURE_PROMOTER_CLIENT_ID
+#                                             only if Azure is enabled: `terraform output github_actions_variables`
+#                                             in terraform/azure-bootstrap (sign-in is skipped when AZURE_TENANT_ID is unset)
 # No AWS keys are stored anywhere: the job exchanges its OIDC token for short-lived credentials.
 name: Build images
 
@@ -99,6 +102,13 @@ jobs:
           role-to-assume: ${{ vars.BUILDER_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
           role-duration-seconds: 14400
+      - name: Sign in to Azure (builder identity)
+        if: ${{ vars.AZURE_TENANT_ID != '' }}       # only when Azure is set up (terraform/azure-bootstrap)
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_BUILDER_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Build, scan and record
         env:
           IMAGEFACTORY_AUTHOR: ${{ github.event_name == 'schedule' && 'scheduler' || github.actor }}
@@ -155,6 +165,13 @@ jobs:
           role-to-assume: ${{ vars.BUILDER_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
           role-duration-seconds: 7200
+      - name: Sign in to Azure (builder identity)
+        if: ${{ vars.AZURE_TENANT_ID != '' }}       # only when Azure is set up (terraform/azure-bootstrap)
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_BUILDER_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Boot smoke test, sign, publish to dev
         env:
           MATRIX: ${{ needs.plan.outputs.matrix }}
