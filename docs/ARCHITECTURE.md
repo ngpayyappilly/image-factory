@@ -262,7 +262,7 @@ Cloud specifics sit behind `Platform` (`platforms/base.py`):
 | `smoke_test(...)` | Boot the distributed image and check it comes up |
 | `deregister(...)` | Retention |
 
-AWS and Azure implement all of it. GCP and VMware implement only `packer_vars`; the rest raise `PlatformNotImplemented`, so
+AWS, Azure and GCP implement all of it. VMware implements only `packer_vars`; the rest raise `PlatformNotImplemented`, so
 enabling one builds fine but promotion fails loudly rather than silently skipping. Details and the status table are in
 [PLATFORMS.md](PLATFORMS.md).
 
@@ -344,5 +344,5 @@ flowchart TB
 ## 12. Not built yet
 
 Daily CVE detection, SLO dashboards and alerting, fleet inventory and drift report, catalog integration, the 6-hourly
-availability probe (`smoke_test` is its building block), Git tagging of versions, GCP/VMware runtime plugins, and an
+availability probe (`smoke_test` is its building block), Git tagging of versions, the VMware runtime plugin, and an
 executed Windows track. Nothing has run against a real AWS account yet.

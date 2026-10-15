@@ -5,7 +5,8 @@ from typing import Dict
 from .aws import AwsPlatform
 from .base import Platform, PlatformNotImplemented
 from .azure import AzurePlatform
-from .optional import GcpPlatform, VmwarePlatform
+from .gcp import GcpPlatform
+from .optional import VmwarePlatform
 
 REGISTRY = {c.name: c for c in (AwsPlatform, AzurePlatform, GcpPlatform, VmwarePlatform)}
 
