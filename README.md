@@ -60,6 +60,12 @@ Azure is implemented end to end: Compute Gallery versions, channel tags, boot sm
 (`terraform/azure-bootstrap`) and a consumer module (`terraform/modules/golden-image-azure`). Setup and design are in
 [docs/PLATFORMS.md](docs/PLATFORMS.md#azure). It is off by default (`platforms.azure.enabled`), and not yet run against a real subscription.
 
+## GCP (optional)
+
+GCP is implemented end to end: Compute Engine images, Secret Manager channel pointers, boot smoke test and retention (`imagefactory/platforms/gcp.py`), a bootstrap
+stack with Workload Identity Federation (`terraform/gcp-bootstrap`) and a consumer module (`terraform/modules/golden-image-gcp`). Setup and design are in
+[docs/PLATFORMS.md](docs/PLATFORMS.md#gcp). Off by default (`platforms.gcp.enabled`), and not yet run against a real project.
+
 ## CPU architectures
 
 Architecture is part of the **flavor**, not a build option: `al2023` (x86_64) and `al2023arm` (arm64/Graviton) are separate

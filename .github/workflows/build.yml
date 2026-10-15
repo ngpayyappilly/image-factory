@@ -11,6 +11,9 @@
 #   AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID, AZURE_BUILDER_CLIENT_ID, AZURE_PROMOTER_CLIENT_ID
 #                                             only if Azure is enabled: `terraform output github_actions_variables`
 #                                             in terraform/azure-bootstrap (sign-in is skipped when AZURE_TENANT_ID is unset)
+#   GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_BUILDER_SERVICE_ACCOUNT, GCP_PROMOTER_SERVICE_ACCOUNT
+#                                             only if GCP is enabled: `terraform output github_actions_variables`
+#                                             in terraform/gcp-bootstrap (sign-in is skipped when the provider is unset)
 # No AWS keys are stored anywhere: the job exchanges its OIDC token for short-lived credentials.
 name: Build images
 
@@ -109,6 +112,12 @@ jobs:
           client-id: ${{ vars.AZURE_BUILDER_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign in to Google Cloud (builder identity)
+        if: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' }}     # only when GCP is set up (terraform/gcp-bootstrap)
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_BUILDER_SERVICE_ACCOUNT }}
       - name: Build, scan and record
         env:
           IMAGEFACTORY_AUTHOR: ${{ github.event_name == 'schedule' && 'scheduler' || github.actor }}
@@ -172,6 +181,12 @@ jobs:
           client-id: ${{ vars.AZURE_BUILDER_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign in to Google Cloud (builder identity)
+        if: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' }}     # only when GCP is set up (terraform/gcp-bootstrap)
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_BUILDER_SERVICE_ACCOUNT }}
       - name: Boot smoke test, sign, publish to dev
         env:
           MATRIX: ${{ needs.plan.outputs.matrix }}
