@@ -43,11 +43,6 @@ platforms:
     gallery_resource_group: imagefactory-gallery
     gallery_name: imagefactory
     replication_regions: [eastus2]       # only regions that are actually used (replication costs money)
-    smoke_test:                          # boot-and-join test, run from the gallery in every replication region
-      resource_group: imagefactory-smoke # holds the short-lived test VMs (created by terraform/azure-bootstrap)
-      subnet_ids: {}                     # {eastus2: /subscriptions/.../subnets/smoke}  (terraform output smoke_test_subnet_ids)
-      vm_size: Standard_B2s
-      timeout_seconds: 900
 
   gcp:
     enabled: false

@@ -25,15 +25,6 @@ def test_platform_specific_forms():
     assert v.gcp == "rhel9-20261110-2"     # GCE names cannot contain dots
 
 
-def test_azure_version_has_no_leading_zeros_so_it_matches_what_azure_stores():
-    # Segments are integers: Jan 5 is 105, never 0105 (must match terraform/modules/golden-image-azure).
-    assert Version.parse("win2022-20260105.12").azure == "2026.105.12"
-    assert Version.parse("rhel9-20261001.3").azure == "2026.1001.3"
-    assert Version.parse("rhel9-20260910.7").azure == "2026.910.7"
-    # ...and distinct dates never collide.
-    assert len({Version.parse("x-2026%02d%02d.1" % (m, d)).azure for m in range(1, 13) for d in range(1, 29)}) == 12 * 28
-
-
 def test_next_version_increments_per_day_and_flavor():
     d = dt.date(2026, 11, 10)
     existing = ["rhel9-20261110.1", "rhel9-20261110.2", "rhel9-20261109.7", "al2023-20261110.5", "junk"]

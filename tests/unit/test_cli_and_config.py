@@ -45,8 +45,7 @@ def test_expired_exceptions_stop_applying(tmp_path):
 
 
 def test_optional_platforms_map_packer_vars_but_fail_loudly_at_runtime(cfg):
-    # Azure has a real runtime (tests/unit/test_azure_platform.py); these two still only map Packer vars.
-    for name, key in (("gcp", "gcp_image_name"), ("vmware", "vsphere_template")):
+    for name, key in (("azure", "azure_image_version"), ("gcp", "gcp_image_name"), ("vmware", "vsphere_template")):
         plat = get_platform(name, cfg)
         from imagefactory.versioning import Version
         assert key in plat.packer_vars(cfg.image("rhel9"), Version.parse("rhel9-20261112.3"))

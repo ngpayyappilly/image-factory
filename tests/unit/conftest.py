@@ -26,7 +26,7 @@ class FakePlatform(Platform):
     def packer_vars(self, flavor_cfg, version):
         return {}
 
-    def images_from_packer(self, artifact_id, flavor, version):
+    def images_from_packer(self, artifact_id):
         return {}
 
     def verify_available(self, version, images):
