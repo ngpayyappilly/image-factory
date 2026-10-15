@@ -54,6 +54,12 @@ Setup:
 
 Actions are pinned to commit SHAs. Bump them deliberately.
 
+## Azure (optional)
+
+Azure is implemented end to end: Compute Gallery versions, channel tags, boot smoke test and retention (`imagefactory/platforms/azure.py`), a bootstrap stack
+(`terraform/azure-bootstrap`) and a consumer module (`terraform/modules/golden-image-azure`). Setup and design are in
+[docs/PLATFORMS.md](docs/PLATFORMS.md#azure). It is off by default (`platforms.azure.enabled`), and not yet run against a real subscription.
+
 ## CPU architectures
 
 Architecture is part of the **flavor**, not a build option: `al2023` (x86_64) and `al2023arm` (arm64/Graviton) are separate

@@ -40,7 +40,7 @@ def make(ec2_by_region, ssm_by_region=None, regions=("us-east-1", "us-west-2")):
 
 def test_images_from_packer():
     p = make({})
-    assert p.images_from_packer("us-east-1:ami-1,us-west-2:ami-2") == {"us-east-1": "ami-1", "us-west-2": "ami-2"}
+    assert p.images_from_packer("us-east-1:ami-1,us-west-2:ami-2", "al2023", V) == {"us-east-1": "ami-1", "us-west-2": "ami-2"}
 
 
 def test_verify_available_ok_and_each_failure_mode():

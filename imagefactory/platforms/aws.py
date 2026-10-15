@@ -58,7 +58,7 @@ class AwsPlatform(Platform):
         }
         return out
 
-    def images_from_packer(self, artifact_id):
+    def images_from_packer(self, artifact_id, flavor, version):
         # "us-east-1:ami-0abc,us-west-2:ami-0def"
         return dict(p.split(":", 1) for p in artifact_id.split(",") if p)
 
