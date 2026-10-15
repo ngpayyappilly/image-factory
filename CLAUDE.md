@@ -83,9 +83,21 @@ Invoke these with the Skill tool when the task matches, before writing code from
 
 Not relevant here (different tools): `aws-cdk`, `aws-cloudformation`, `aws-deployment`. This repo uses Terraform, Packer and GitHub Actions.
 
+## Workflow: every change goes through a pull request
+
+`main` is protected on GitHub (PR required, no direct pushes, no force-push, even for admins; required checks `check` and `unit-tests-py39`). This is a standing decision, so never push to `main` and never try to work around the protection.
+
+1. Branch from an up-to-date `main` (`feat/...`, `fix/...`, `docs/...`, `chore/...`).
+2. Run `make check` locally first.
+3. Commit with a clear message (end it with the attribution line from the session), push the **branch**, and open the PR with `gh pr create` (end the description with the attribution line). Say what changed, why, and what was and was not verified.
+4. Wait for CI to pass. **Do not merge unless the user asks**; the user decides when.
+5. Applies to docs and config changes too. Keep PRs focused; one concern per PR.
+
+Committing and pushing still only happens when the user asks for it (or asks for a change that is meant to land). When they do, that means a branch and a PR.
+
 ## Ask before doing
 
-Real-cloud and outward-facing actions are never part of routine work here. Confirm first before: `terraform apply`, `make build`, `packer build`, `imagefactory promote|rollback|release|sign`, `imagefactory retention --apply` (deregisters AMIs and deletes snapshots), or anything using real AWS credentials. Dry runs (`retention` without `--apply`, `packer validate`, `terraform validate`) are fine. Don't commit or push unless asked.
+Real-cloud and outward-facing actions are never part of routine work here. Confirm first before: `terraform apply`, `make build`, `packer build`, `imagefactory promote|rollback|release|sign`, `imagefactory retention --apply` (deregisters AMIs and deletes snapshots), or anything using real AWS credentials. Dry runs (`retention` without `--apply`, `packer validate`, `terraform validate`) are fine. Don't commit or push unless asked, and never to `main` directly (see the PR workflow above).
 
 ## Known gaps (don't assume these exist)
 
