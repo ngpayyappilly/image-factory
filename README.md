@@ -47,7 +47,7 @@ Setup:
    `PROMOTER_ROLE_ARN`) plus `TOOL_URLS_JSON` and `TOOL_SHA256_JSON`. Optional: `IMAGEFACTORY_RUNNER`, `PACKER_VERSION`.
 3. Create the environments `imagefactory-canary` and `imagefactory-stable` with **Required reviewers** and **Prevent self-review**
    (`imagefactory-maintenance` needs no reviewers). Restrict who can push to `main`.
-4. **Runner choice.** Default is `ubuntu-latest` (GitHub-hosted): set `platforms.aws.restrict_build_sg_to_runner_ip: true` so the
+4. **Runner choice.** Default is `ubuntu-24.04` (GitHub-hosted, pinned rather than `ubuntu-latest` so runner upgrades are deliberate): set `platforms.aws.restrict_build_sg_to_runner_ip: true` so the
    temporary SSH/WinRM rule opens only to the runner's IP, and build in a subnet with a public IP. For private subnets or
    Windows builds that need internal network paths, register a self-hosted runner and set `IMAGEFACTORY_RUNNER`.
 5. Run **Build images** manually once (`flavors: al2023`) before relying on the schedule.

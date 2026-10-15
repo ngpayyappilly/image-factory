@@ -5,7 +5,7 @@
 #   AWS_REGION, BUILDER_ROLE_ARN              from `terraform output github_actions_variables`
 #   TOOL_URLS_JSON, TOOL_SHA256_JSON          pinned gate tools per CPU architecture:
 #                                             {"x86_64": {"goss": "...", "trivy": "...", "syft": "..."}, "arm64": {...}}
-#   IMAGEFACTORY_RUNNER (optional)            runner label; default ubuntu-latest. Use a self-hosted label
+#   IMAGEFACTORY_RUNNER (optional)            runner label; default ubuntu-24.04 (pinned, bump deliberately). Use a self-hosted label
 #                                             for builds inside a private network.
 #   PACKER_VERSION (optional)                 pin Packer; default latest
 # No AWS keys are stored anywhere: the job exchanges its OIDC token for short-lived credentials.
@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
   plan:
-    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-24.04' }}
     permissions:
       id-token: write
       contents: read
@@ -47,12 +47,12 @@ jobs:
       include: ${{ steps.plan.outputs.include }}
       exhausted: ${{ steps.plan.outputs.exhausted }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - run: pip install -e .
-      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.BUILDER_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -75,7 +75,7 @@ jobs:
   build:
     needs: plan
     if: needs.plan.outputs.build == 'true'
-    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 120
     permissions:
       id-token: write
@@ -86,15 +86,15 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.include) }}
     name: build ${{ matrix.flavor }} on ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - run: pip install -e . ansible-core
       - uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789 # v3.4.0
         with:
           version: ${{ vars.PACKER_VERSION || 'latest' }}
-      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.BUILDER_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -111,7 +111,7 @@ jobs:
         run: scripts/build.sh "$M_FLAVOR" "$M_PLATFORM" "$M_VERSION"
       - name: Keep gate evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: reports-${{ matrix.flavor }}-${{ matrix.platform }}
           path: artifacts/reports
@@ -122,7 +122,7 @@ jobs:
   alert:
     needs: plan
     if: ${{ needs.plan.outputs.exhausted != '' }}
-    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-24.04' }}
     steps:
       - env:
           EXHAUSTED: ${{ needs.plan.outputs.exhausted }}
@@ -137,18 +137,20 @@ jobs:
     # cannot be promoted to canary or stable.
     needs: [plan, build]
     if: ${{ !cancelled() && needs.plan.outputs.build == 'true' }}
-    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-24.04' }}
     permissions:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - run: pip install -e .
       - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
-      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          cosign-release: v2.6.5     # same pin as scripts/install-tools.sh, so GitHub and Azure DevOps sign identically
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.BUILDER_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}

@@ -160,7 +160,7 @@ placed straight into the step's environment, never into logs or pipeline variabl
 
 **GitHub:** repository variables `AWS_REGION`, `BUILDER_ROLE_ARN`, `PROMOTER_ROLE_ARN` (from
 `terraform output github_actions_variables`), `TOOL_URLS_JSON`, `TOOL_SHA256_JSON` (keyed by CPU architecture, then tool);
-optional `IMAGEFACTORY_RUNNER` (runner label, default `ubuntu-latest`) and `PACKER_VERSION`. Environments
+optional `IMAGEFACTORY_RUNNER` (runner label, default `ubuntu-24.04`, pinned so runner image upgrades are deliberate) and `PACKER_VERSION`. Environments
 `imagefactory-canary` and `imagefactory-stable` with Required reviewers and "Prevent self-review", plus
 `imagefactory-maintenance`. Protect `main`.
 
@@ -218,7 +218,9 @@ differences are authentication, how approval is enforced, and PR validation (Git
 ## 11. Security notes
 - Workflow inputs and matrix values are passed to scripts through `env:`, never interpolated into shell, to avoid script
   injection.
-- Actions are pinned to commit SHAs (with the version in a comment). Bump deliberately.
+- Actions are pinned to commit SHAs (with the version in a comment). Bump deliberately. They all run on Node 24 (or are
+  composite). **Self-hosted GitHub runners must be a recent runner release (v2.327.1 or newer) to run Node 24 actions.** The runner
+  image is pinned to `ubuntu-24.04` for the same reason: `ubuntu-latest` moves to a new major image on GitHub's schedule.
 - The builder role cannot be assumed from pull requests or feature branches, and cannot touch `canary` or `stable`.
 - Gate tooling is downloaded only with a pinned SHA256.
 
