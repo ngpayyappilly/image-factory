@@ -67,7 +67,7 @@ def cmd_manifest_create(a, cfg):
     builds = [b for b in packer["builds"] if b["builder_type"] == plat.packer_source]
     if not builds:
         raise SystemExit("no %s build in %s" % (plat.packer_source, a.packer_manifest))
-    images = plat.images_from_packer(builds[-1]["artifact_id"], a.flavor, Version.parse(a.version))
+    images = plat.images_from_packer(builds[-1]["artifact_id"])
     released = store.get(mf.manifest_key(a.flavor, a.version))
     if released and released.get("signature"):
         raise SystemExit("%s is already released; images are immutable" % a.version)

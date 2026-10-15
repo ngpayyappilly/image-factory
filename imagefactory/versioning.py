@@ -33,10 +33,8 @@ class Version:
     # kept in a tag/label/metadata field so lookups stay unambiguous.
     @property
     def azure(self) -> str:
-        """Azure Compute Gallery versions are Major.Minor.Patch *integers*. MMDD is written without a leading
-        zero (Jan 5 -> 105, not 0105) so the name is the same string Azure stores whether or not it
-        normalises numeric segments, and our computed resource IDs always match."""
-        return "%s.%d.%d" % (self.date[:4], int(self.date[4:]), self.build)
+        """Azure Compute Gallery versions must be Major.Minor.Patch integers."""
+        return "%s.%s.%d" % (self.date[:4], self.date[4:], self.build)
 
     @property
     def gcp(self) -> str:

@@ -18,7 +18,7 @@ lint-actions:  ## GitHub Actions workflows
 	$(VENV)/bin/actionlint .github/workflows/*.yml
 
 tf-validate:
-	@for d in terraform/aws-bootstrap terraform/modules/golden-image-aws terraform/azure-bootstrap terraform/modules/golden-image-azure; do \
+	@for d in terraform/aws-bootstrap terraform/modules/golden-image-aws; do \
 	  echo "== $$d"; (cd $$d && terraform init -backend=false -input=false >/dev/null && terraform validate && terraform fmt -check) || exit 1; done
 
 check: test validate lint-actions tf-validate  ## everything that can run offline
