@@ -1,0 +1,26 @@
+---
+# Hermetic-ish package state: drop the org's pinned mirror repo definitions into
+# ansible/files/repos/*.repo and they are installed before updating. On Amazon Linux 2023 set
+# distro_releasever (e.g. 2023.6.20250203) to pin to that exact repository snapshot.
+- name: Install org mirror repo definitions
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: /etc/yum.repos.d/{{ item | basename }}
+    owner: root
+    group: root
+    mode: "0644"
+  with_fileglob:
+    - "{{ playbook_dir }}/files/repos/*.repo"
+
+- name: Upgrade all packages
+  ansible.builtin.dnf:
+    name: "*"
+    state: latest
+    update_cache: true
+    releasever: "{{ distro_releasever if distro_releasever | length > 0 else omit }}"
+  register: pkg_upgrade
+
+- name: Reboot if the kernel or core libraries changed
+  ansible.builtin.reboot:
+    reboot_timeout: 900
+  when: pkg_upgrade is changed

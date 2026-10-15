@@ -1,0 +1,91 @@
+# Promote an existing image to canary/stable, or roll a channel back. Never rebuilds.
+#
+# Run it as the approver: the CLI rejects the build's author as approver, and each environment
+# below has Approvals & checks (second approver) configured in Azure DevOps.
+# Environments to create: imagefactory-canary, imagefactory-stable.
+# The pool needs python3, git and the AWS CLI; cosign is installed by scripts/install-tools.sh.
+trigger: none
+
+parameters:
+  - name: action
+    type: string
+    default: promote
+    values: [promote, rollback]
+  - name: flavor
+    type: string
+  - name: version
+    displayName: Version to promote (ignored for rollback)
+    type: string
+    default: ""
+  - name: to
+    displayName: Target channel
+    type: string
+    default: canary
+    values: [canary, stable]
+  - name: expedite
+    displayName: Critical-CVE path, shortened canary bake (not skipped)
+    type: boolean
+    default: false
+  - name: noOpenSev2
+    displayName: I confirm there is no open Sev-2 tied to this image
+    type: boolean
+    default: false
+  - name: reason
+    displayName: Rollback reason (required for rollback)
+    type: string
+    default: ""
+
+variables:
+  - group: imagefactory
+  - name: lockOwner
+    value: ado-$(Build.BuildId)
+
+pool:
+  name: imagefactory-agents
+
+stages:
+  - stage: Channel
+    jobs:
+      - deployment: change
+        displayName: ${{ parameters.action }} ${{ parameters.flavor }} -> ${{ parameters.to }}
+        environment: imagefactory-${{ parameters.to }}      # approval checks live on the environment
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - script: |
+                    python3 -m venv .venv && .venv/bin/pip install -q -e .
+                    echo "##vso[task.prependpath]$PWD/.venv/bin"
+                    scripts/install-tools.sh cosign
+                  displayName: Install CLI and cosign
+                # Serialize changes to one flavor's channels (also against retention). Waits up to 10 minutes.
+                - script: |
+                    set -euo pipefail
+                    eval "$(scripts/assume-role.sh "$PROMOTER_ROLE_ARN" "lock-$(Build.BuildId)")"
+                    imagefactory lock acquire --name "channels-${{ parameters.flavor }}" --owner "$(lockOwner)" --ttl-minutes 30 --wait-minutes 10
+                  displayName: Lock channels
+                - ${{ if eq(parameters.action, 'promote') }}:
+                    - script: |
+                        set -euo pipefail
+                        eval "$(scripts/assume-role.sh "$PROMOTER_ROLE_ARN" "promote-$(Build.BuildId)")"
+                        args=()
+                        [ "${{ parameters.expedite }}" = True ] && args+=(--expedite)
+                        [ "${{ parameters.noOpenSev2 }}" = True ] && args+=(--no-open-sev2)
+                        imagefactory promote --flavor "${{ parameters.flavor }}" --version "${{ parameters.version }}" \
+                          --to "${{ parameters.to }}" --approved-by "$(Build.RequestedForEmail)" ${args[@]+"${args[@]}"}
+                      displayName: Promote
+                - ${{ if eq(parameters.action, 'rollback') }}:
+                    - script: |
+                        set -euo pipefail
+                        eval "$(scripts/assume-role.sh "$PROMOTER_ROLE_ARN" "rollback-$(Build.BuildId)")"
+                        imagefactory rollback --flavor "${{ parameters.flavor }}" --channel "${{ parameters.to }}" \
+                          --approved-by "$(Build.RequestedForEmail)" --reason "${{ parameters.reason }}"
+                        echo "Publish a notice and open a post-incident review: a pull-back is a missed gate."
+                      displayName: Roll back
+                - script: |
+                    set -euo pipefail
+                    eval "$(scripts/assume-role.sh "$PROMOTER_ROLE_ARN" "unlock-$(Build.BuildId)")"
+                    imagefactory lock release --name "channels-${{ parameters.flavor }}" --owner "$(lockOwner)"
+                  condition: always()
+                  displayName: Release channels lock

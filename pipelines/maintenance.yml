@@ -1,0 +1,44 @@
+# Weekly retention: deprecate versions outside N / N-1, delete those deprecated for 60+ days, and clean up
+# builds that never released. Dry-run by default on manual runs; the schedule applies it.
+# Takes the same per-flavor channels lock as promote.yml so retention never races a promotion.
+trigger: none
+
+schedules:
+  - cron: "0 5 * * 0"
+    displayName: Weekly retention
+    branches: { include: [main] }
+    always: true
+
+parameters:
+  - name: apply
+    type: boolean
+    default: false
+
+variables:
+  - group: imagefactory
+  - name: lockOwner
+    value: ado-$(Build.BuildId)
+
+pool:
+  name: imagefactory-agents
+
+jobs:
+  - job: retention
+    steps:
+      - script: |
+          python3 -m venv .venv && .venv/bin/pip install -q -e .
+          echo "##vso[task.prependpath]$PWD/.venv/bin"
+        displayName: Install CLI
+      - script: |
+          set -euo pipefail
+          eval "$(scripts/assume-role.sh "$PROMOTER_ROLE_ARN" "retention-$(Build.BuildId)")"
+          apply=""
+          if [ "$(Build.Reason)" = Schedule ] || [ "${{ parameters.apply }}" = True ]; then apply="--apply"; fi
+          status=0
+          for f in $(imagefactory matrix | python3 -c 'import json,sys; print(*{r["flavor"] for r in json.load(sys.stdin)})'); do
+            imagefactory lock acquire --name "channels-$f" --owner "$(lockOwner)" --ttl-minutes 60 --wait-minutes 10 || { status=1; continue; }
+            imagefactory retention --flavor "$f" $apply || status=1
+            imagefactory lock release --name "channels-$f" --owner "$(lockOwner)" || true
+          done
+          exit $status
+        displayName: Retention

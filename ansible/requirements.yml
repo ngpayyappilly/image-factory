@@ -1,0 +1,14 @@
+---
+# External CIS hardening roles, pinned to reviewed tags. Install with:
+#   ansible-galaxy install -r ansible/requirements.yml -p ansible/external
+# Bump a tag only through a PR that rebuilds the image and passes the compliance gate.
+# Open item: confirm Security's mandated standard; swap these roles if it is not CIS.
+roles:
+  - name: AMAZON2023-CIS
+    src: https://github.com/ansible-lockdown/AMAZON2023-CIS
+    scm: git
+    version: 1.5.0
+  - name: RHEL9-CIS
+    src: https://github.com/ansible-lockdown/RHEL9-CIS
+    scm: git
+    version: 2.4.2

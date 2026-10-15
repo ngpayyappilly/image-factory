@@ -1,0 +1,100 @@
+# Promote an existing image to canary/stable, or roll a channel back. Never rebuilds.
+#
+# Create GitHub environments `imagefactory-canary` and `imagefactory-stable` with Required reviewers
+# (enable "Prevent self-review"). The promoter AWS role can only be assumed from jobs running inside
+# those environments, so AWS itself refuses promotion without the approval. The CLI additionally
+# rejects the build's author as approver.
+name: Promote or roll back
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        options: [promote, rollback]
+        default: promote
+      flavor:
+        description: Image flavor (e.g. al2023)
+        required: true
+      version:
+        description: Version to promote, e.g. al2023-20261112.1 (ignored for rollback)
+        default: ""
+      to:
+        description: Target channel
+        type: choice
+        options: [canary, stable]
+        default: canary
+      expedite:
+        description: Critical-CVE path, shortened canary bake (not skipped)
+        type: boolean
+        default: false
+      no_open_sev2:
+        description: I confirm there is no open Sev-2 tied to this image
+        type: boolean
+        default: false
+      reason:
+        description: Rollback reason (required for rollback)
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: imagefactory-channels-${{ inputs.flavor }}
+  cancel-in-progress: false
+
+jobs:
+  change:
+    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-latest' }}
+    environment: imagefactory-${{ inputs.to }}      # required reviewers are configured on the environment
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.PROMOTER_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      # Serialize changes to one flavor's channels, also against the weekly retention run. Waits up to 10 minutes.
+      - name: Lock channels
+        env:
+          FLAVOR: ${{ inputs.flavor }}
+          OWNER: gh-${{ github.run_id }}-${{ github.run_attempt }}
+        run: imagefactory lock acquire --name "channels-$FLAVOR" --owner "$OWNER" --ttl-minutes 30 --wait-minutes 10
+      - name: Change channel
+        env:
+          ACTION: ${{ inputs.action }}
+          FLAVOR: ${{ inputs.flavor }}
+          VERSION: ${{ inputs.version }}
+          TO: ${{ inputs.to }}
+          EXPEDITE: ${{ inputs.expedite }}
+          NO_SEV2: ${{ inputs.no_open_sev2 }}
+          REASON: ${{ inputs.reason }}
+          APPROVER: ${{ github.triggering_actor }}
+        run: |
+          set -euo pipefail
+          if [ "$ACTION" = rollback ]; then
+            [ -n "$REASON" ] || { echo "a rollback needs a reason" >&2; exit 2; }
+            imagefactory rollback --flavor "$FLAVOR" --channel "$TO" --approved-by "$APPROVER" --reason "$REASON"
+            echo "Publish a notice and open a post-incident review: a pull-back means a gate missed something."
+          else
+            [ -n "$VERSION" ] || { echo "a promotion needs a version" >&2; exit 2; }
+            args=()
+            [ "$EXPEDITE" = true ] && args+=(--expedite)
+            [ "$NO_SEV2" = true ] && args+=(--no-open-sev2)
+            imagefactory promote --flavor "$FLAVOR" --version "$VERSION" --to "$TO" \
+              --approved-by "$APPROVER" ${args[@]+"${args[@]}"}
+          fi
+          imagefactory status --flavor "$FLAVOR"
+      - name: Release channels lock
+        if: always()
+        env:
+          FLAVOR: ${{ inputs.flavor }}
+          OWNER: gh-${{ github.run_id }}-${{ github.run_attempt }}
+        run: imagefactory lock release --name "channels-$FLAVOR" --owner "$OWNER"

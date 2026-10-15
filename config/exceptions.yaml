@@ -1,0 +1,10 @@
+# Time-boxed, approved gate exceptions. Anything not listed here is a hard failure.
+# Expired entries are ignored automatically, so a forgotten exception re-blocks promotion.
+#
+# exceptions:
+#   - id: CVE-2026-12345          # CVE id (vuln_scan), trivy RuleID (secrets) or check id/title (compliance)
+#     gate: vuln_scan
+#     reason: no fixed package yet; mitigated by <control>
+#     approved_by: security-team
+#     expires: 2026-12-01
+exceptions: []

@@ -1,0 +1,54 @@
+# Weekly retention: deprecate versions outside N / N-1, delete those deprecated for 60+ days.
+# Manual runs are a dry run unless `apply` is ticked; the weekly schedule applies it.
+name: Retention
+
+on:
+  schedule:
+    - cron: "0 5 * * 0"
+  workflow_dispatch:
+    inputs:
+      apply:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: imagefactory-retention
+  cancel-in-progress: false
+
+jobs:
+  retention:
+    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-latest' }}
+    environment: imagefactory-maintenance
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.PROMOTER_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Retention
+        env:
+          EVENT: ${{ github.event_name }}
+          APPLY: ${{ inputs.apply }}
+          OWNER: gh-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          apply=""
+          if [ "$EVENT" = schedule ] || [ "$APPLY" = true ]; then apply="--apply"; fi
+          status=0
+          for f in $(imagefactory matrix | python -c 'import json,sys; print(*{r["flavor"] for r in json.load(sys.stdin)})'); do
+            # Same per-flavor lock as promote.yml: retention never races a promotion or rollback.
+            imagefactory lock acquire --name "channels-$f" --owner "$OWNER" --ttl-minutes 60 --wait-minutes 10 || { status=1; continue; }
+            imagefactory retention --flavor "$f" $apply || status=1
+            imagefactory lock release --name "channels-$f" --owner "$OWNER" || true
+          done
+          exit $status

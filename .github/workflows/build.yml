@@ -1,0 +1,160 @@
+# Build -> gate -> boot smoke test -> sign -> publish AMIs to AWS (dev channel).
+# Promotion to canary/stable is promote.yml (approval-gated). See README "GitHub Actions".
+#
+# Repository variables (Settings > Secrets and variables > Actions > Variables):
+#   AWS_REGION, BUILDER_ROLE_ARN              from `terraform output github_actions_variables`
+#   TOOL_URLS_JSON, TOOL_SHA256_JSON          pinned gate tools per CPU architecture:
+#                                             {"x86_64": {"goss": "...", "trivy": "...", "syft": "..."}, "arm64": {...}}
+#   IMAGEFACTORY_RUNNER (optional)            runner label; default ubuntu-latest. Use a self-hosted label
+#                                             for builds inside a private network.
+#   PACKER_VERSION (optional)                 pin Packer; default latest
+# No AWS keys are stored anywhere: the job exchanges its OIDC token for short-lived credentials.
+name: Build images
+
+on:
+  schedule:
+    # Daily. A flavor stays *due* from the monthly build day (Patch Tuesday + 2 business days) until a build
+    # has been released that month, so a failed or delayed run is retried here. After
+    # schedule.max_attempts_per_month the `alert` job fails the run instead of silently doing nothing.
+    - cron: "0 6 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      flavors:
+        description: Flavors to build, comma separated (empty = all)
+        default: ""
+      reason:
+        description: Why this build runs (recorded in the run, audited by GitHub)
+        type: choice
+        options: [manual, critical-cve, baseline-change, new-os-minor]
+        default: manual
+
+permissions:
+  contents: read
+
+concurrency:
+  group: imagefactory-build        # never two builds racing on versions or channels
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-latest' }}
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      build: ${{ steps.plan.outputs.any }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      include: ${{ steps.plan.outputs.include }}
+      exhausted: ${{ steps.plan.outputs.exhausted }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.BUILDER_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Plan versions and matrix
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          FLAVORS: ${{ inputs.flavors }}
+          REASON: ${{ inputs.reason || 'scheduled' }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = schedule ]; then
+            echo "Scheduled run: planning only the flavors whose monthly build is due."
+            imagefactory plan --scheduled --run-id "$GITHUB_RUN_ID" --github-output
+          else
+            echo "Manual run ($REASON) triggered by $GITHUB_ACTOR"
+            imagefactory plan --flavors "$FLAVORS" --run-id "$GITHUB_RUN_ID" --github-output
+          fi
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 120
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false               # let sibling builds finish and clean up their instances
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.include) }}
+    name: build ${{ matrix.flavor }} on ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - run: pip install -e . ansible-core
+      - uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789 # v3.4.0
+        with:
+          version: ${{ vars.PACKER_VERSION || 'latest' }}
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.BUILDER_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-duration-seconds: 14400
+      - name: Build, scan and record
+        env:
+          IMAGEFACTORY_AUTHOR: ${{ github.event_name == 'schedule' && 'scheduler' || github.actor }}
+          IMAGEFACTORY_RUN_ID: ${{ github.run_id }}
+          TOOL_URLS_JSON: ${{ vars.TOOL_URLS_JSON }}
+          TOOL_SHA256_JSON: ${{ vars.TOOL_SHA256_JSON }}
+          M_FLAVOR: ${{ matrix.flavor }}
+          M_PLATFORM: ${{ matrix.platform }}
+          M_VERSION: ${{ matrix.version }}
+        run: scripts/build.sh "$M_FLAVOR" "$M_PLATFORM" "$M_VERSION"
+      - name: Keep gate evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: reports-${{ matrix.flavor }}-${{ matrix.platform }}
+          path: artifacts/reports
+          if-no-files-found: ignore
+          retention-days: 90
+
+  # Fails the run (and so notifies) when a flavor used up its retries this month. Independent of the build.
+  alert:
+    needs: plan
+    if: ${{ needs.plan.outputs.exhausted != '' }}
+    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - env:
+          EXHAUSTED: ${{ needs.plan.outputs.exhausted }}
+        run: |
+          echo "::error title=Monthly build did not succeed::Retries exhausted for: $EXHAUSTED. Investigate, then run this workflow manually."
+          exit 1
+
+  release:
+    # Runs even if some builds failed. `release` judges each flavor on its own (all its platform builds recorded
+    # and every gate green): ready flavors are boot-tested, signed and published to dev; a flavor that is not
+    # ready is reported and fails this job, but never blocks the others. A failing image is never signed, so it
+    # cannot be promoted to canary or stable.
+    needs: [plan, build]
+    if: ${{ !cancelled() && needs.plan.outputs.build == 'true' }}
+    runs-on: ${{ vars.IMAGEFACTORY_RUNNER || 'ubuntu-latest' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.BUILDER_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-duration-seconds: 7200
+      - name: Boot smoke test, sign, publish to dev
+        env:
+          MATRIX: ${{ needs.plan.outputs.matrix }}
+          RUN_ID: ${{ github.run_id }}
+        run: imagefactory release --matrix "$MATRIX" --run-id "$RUN_ID"

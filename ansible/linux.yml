@@ -1,0 +1,34 @@
+---
+# Shared Linux hardening. Identical for every platform: the Packer source is the only thing that differs.
+#
+# Order matters:
+#   1. updates   latest packages (pinned via distro_releasever / org mirror repos)
+#   2. CIS       external ansible-lockdown role for the flavor (pinned in requirements.yml)
+#   3. baseline  our enforcement + deliberate deviations, last so it wins over the CIS role
+- name: ImageFactory Linux baseline
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    flavor: ""
+    cis_role: ""
+    baseline_version: "0.0.0"
+    image_version: "unknown"
+    architecture: "x86_64"
+    git_commit: "unknown"
+    distro_releasever: ""
+  vars_files:
+    - "vars/cis_{{ flavor }}.yml"
+
+  roles:
+    - updates
+
+  tasks:
+    - name: CIS Level 1 ({{ cis_role }})
+      ansible.builtin.include_role:
+        name: "{{ cis_role }}"
+      when: cis_role | length > 0
+
+    - name: ImageFactory baseline
+      ansible.builtin.include_role:
+        name: baseline

@@ -1,0 +1,89 @@
+---
+- name: sshd hardening drop-in
+  ansible.builtin.template:
+    src: sshd-imagefactory.conf.j2
+    dest: /etc/ssh/sshd_config.d/00-imagefactory.conf
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: sshd config must be valid
+  ansible.builtin.command: sshd -t
+  changed_when: false
+
+- name: Kernel and network sysctls
+  ansible.builtin.template:
+    src: sysctl-imagefactory.conf.j2
+    dest: /etc/sysctl.d/60-imagefactory.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload sysctl
+
+- name: Blacklist unused filesystem modules
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/imagefactory-blacklist.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {% for m in ['cramfs', 'freevxfs', 'hfs', 'hfsplus', 'jffs2', 'udf'] %}
+      install {{ m }} /bin/false
+      blacklist {{ m }}
+      {% endfor %}
+
+- name: Disable core dumps
+  ansible.builtin.copy:
+    dest: /etc/security/limits.d/60-imagefactory-core.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: "* hard core 0\n"
+
+- name: Install audit and time sync
+  ansible.builtin.dnf:
+    name: [audit, chrony]
+    state: present
+
+- name: Audit rules for identity, sudo and time changes
+  ansible.builtin.copy:
+    dest: /etc/audit/rules.d/60-imagefactory.rules
+    owner: root
+    group: root
+    mode: "0640"
+    content: |
+      -w /etc/passwd -p wa -k identity
+      -w /etc/group -p wa -k identity
+      -w /etc/shadow -p wa -k identity
+      -w /etc/sudoers -p wa -k scope
+      -w /etc/sudoers.d/ -p wa -k scope
+      -a always,exit -F arch=b64 -S adjtimex,settimeofday,clock_settime -k time-change
+  notify: reload audit rules
+
+- name: Enable auditd and chronyd at boot
+  ansible.builtin.service:
+    name: "{{ item }}"
+    enabled: true
+  loop: [auditd, chronyd]
+
+- name: Warning banners
+  ansible.builtin.copy:
+    dest: "{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "Authorized use only. Activity may be monitored and reported.\n"
+  loop: [/etc/issue, /etc/issue.net]
+
+- name: Record image provenance on the machine (fleet inventory: which VM runs which build)
+  ansible.builtin.copy:
+    dest: /etc/imagefactory-release
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      IMAGEFACTORY_VERSION={{ image_version }}
+      IMAGEFACTORY_FLAVOR={{ flavor }}
+      IMAGEFACTORY_ARCH={{ architecture }}
+      IMAGEFACTORY_BASELINE={{ baseline_version }}
+      IMAGEFACTORY_COMMIT={{ git_commit }}

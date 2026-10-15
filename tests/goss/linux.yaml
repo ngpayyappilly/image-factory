@@ -1,0 +1,64 @@
+# Functional and provenance checks: "is this a sane, sealed, correctly-built image?"
+# Run inside the build VM by packer/scripts/linux/gates.sh -> goss.json -> `goss` gate.
+# FLAVOR is passed in the environment.
+
+file:
+  /etc/imagefactory-release:
+    exists: true
+    contains:
+      - "IMAGEFACTORY_VERSION=/{{ .Env.FLAVOR }}-[0-9]{8}\\.[0-9]+/"
+      - "IMAGEFACTORY_BASELINE="
+      - "IMAGEFACTORY_COMMIT="
+  # Sealed: machine identity must not ship (regenerated per instance at first boot).
+  /etc/ssh/ssh_host_ed25519_key:
+    exists: false
+  /etc/ssh/ssh_host_rsa_key:
+    exists: false
+  /etc/ssh/sshd_config.d/00-imagefactory.conf:
+    exists: true
+    mode: "0600"
+
+command:
+  machine-id-empty:
+    exec: test ! -s /etc/machine-id
+    exit-status: 0
+  sshd-config-valid:
+    exec: sshd -t -h /tmp/imagefactory-tools/hostkey
+    exit-status: 0
+  no-pending-security-updates:
+    exec: sh -c 'dnf -q check-update --security; test $? -ne 100'
+    exit-status: 0
+    timeout: 120000
+
+package:
+  cloud-init:
+    installed: true
+  audit:
+    installed: true
+  chrony:
+    installed: true
+  # Insecure legacy services must not be present.
+  telnet-server:
+    installed: false
+  rsh-server:
+    installed: false
+  ypserv:
+    installed: false
+  tftp-server:
+    installed: false
+
+service:
+  sshd:
+    enabled: true
+  auditd:
+    enabled: true
+  chronyd:
+    enabled: true
+  cloud-init:
+    enabled: true
+
+{{ if eq .Env.FLAVOR "al2023" }}
+  # Amazon Linux ships the SSM agent; fleet patching and Session Manager depend on it.
+  amazon-ssm-agent:
+    enabled: true
+{{ end }}

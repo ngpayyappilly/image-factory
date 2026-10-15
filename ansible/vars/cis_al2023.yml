@@ -1,0 +1,6 @@
+---
+# Overrides passed to the AMAZON2023-CIS role for this flavor. Use this for rules that break the
+# build or the platform (the build user must keep SSH access until the last provisioner).
+# Every override is a documented deviation: add the reason, and an entry in config/exceptions.yaml
+# if the compliance gate would otherwise fail. Variable names come from the role's defaults/main.yml.
+cis_overrides_loaded: true

@@ -1,0 +1,107 @@
+# CIS Level 1 subset audit -> compliance.json -> `compliance` gate (score vs promotion.compliance_min_score).
+#
+# This is a hand-written subset of the checks that matter most, NOT a certified CIS scan.
+# Open item: Security may mandate a specific scanner/standard. If so, replace this file with
+# that scanner's output in goss JSON format (or add a parser in imagefactory/gates.py) and
+# keep the gate name `compliance`. `meta.id` is what config/exceptions.yaml refers to.
+
+command:
+  sshd-root-login:
+    meta: {id: cis-ssh-permitrootlogin}
+    exec: sshd -T -h /tmp/imagefactory-tools/hostkey
+    exit-status: 0
+    stdout: ["permitrootlogin no"]
+  sshd-password-auth:
+    meta: {id: cis-ssh-passwordauthentication}
+    exec: sshd -T -h /tmp/imagefactory-tools/hostkey
+    exit-status: 0
+    stdout: ["passwordauthentication no"]
+  sshd-empty-passwords:
+    meta: {id: cis-ssh-permitemptypasswords}
+    exec: sshd -T -h /tmp/imagefactory-tools/hostkey
+    exit-status: 0
+    stdout: ["permitemptypasswords no"]
+  sshd-x11:
+    meta: {id: cis-ssh-x11forwarding}
+    exec: sshd -T -h /tmp/imagefactory-tools/hostkey
+    exit-status: 0
+    stdout: ["x11forwarding no"]
+  sshd-max-auth-tries:
+    meta: {id: cis-ssh-maxauthtries}
+    exec: sshd -T -h /tmp/imagefactory-tools/hostkey
+    exit-status: 0
+    stdout: ["maxauthtries 4"]
+  sshd-client-alive:
+    meta: {id: cis-ssh-clientalive}
+    exec: sshd -T -h /tmp/imagefactory-tools/hostkey
+    exit-status: 0
+    stdout: ["clientaliveinterval 300", "clientalivecountmax 3"]
+  fs-cramfs-disabled:
+    meta: {id: cis-fs-cramfs}
+    exec: modprobe -n -v cramfs
+    stdout: ["install /bin/false"]
+  fs-udf-disabled:
+    meta: {id: cis-fs-udf}
+    exec: modprobe -n -v udf
+    stdout: ["install /bin/false"]
+
+kernel-param:
+  kernel.randomize_va_space:
+    meta: {id: cis-kernel-aslr}
+    value: "2"
+  fs.suid_dumpable:
+    meta: {id: cis-kernel-suid-dumpable}
+    value: "0"
+  net.ipv4.conf.all.send_redirects:
+    meta: {id: cis-net-send-redirects}
+    value: "0"
+  net.ipv4.conf.all.accept_redirects:
+    meta: {id: cis-net-accept-redirects}
+    value: "0"
+  net.ipv4.conf.all.accept_source_route:
+    meta: {id: cis-net-source-route}
+    value: "0"
+  net.ipv4.tcp_syncookies:
+    meta: {id: cis-net-syncookies}
+    value: "1"
+
+file:
+  /etc/passwd:
+    meta: {id: cis-perm-passwd}
+    mode: "0644"
+    owner: root
+    group: root
+  /etc/shadow:
+    meta: {id: cis-perm-shadow}
+    mode: "0000"
+    owner: root
+    group: root
+  /etc/group:
+    meta: {id: cis-perm-group}
+    mode: "0644"
+    owner: root
+    group: root
+  /etc/issue.net:
+    meta: {id: cis-banner-issue-net}
+    exists: true
+    contains: ["Authorized use only"]
+
+service:
+  auditd:
+    meta: {id: cis-audit-enabled}
+    enabled: true
+  chronyd:
+    meta: {id: cis-time-sync}
+    enabled: true
+  rpcbind:
+    meta: {id: cis-svc-rpcbind}
+    enabled: false
+  vsftpd:
+    meta: {id: cis-svc-ftp}
+    enabled: false
+  telnet.socket:
+    meta: {id: cis-svc-telnet}
+    enabled: false
+  tftp.socket:
+    meta: {id: cis-svc-tftp}
+    enabled: false

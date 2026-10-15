@@ -1,0 +1,136 @@
+# ImageFactory configuration: flavors, platforms and promotion policy, all as code.
+# Anything marked CHANGE-ME must be set in Phase 0 before the first real build.
+
+baseline_version: "1.0.0"      # version of the hardening baseline (ansible/ + packer/scripts); recorded in image tags
+
+store:                         # manifests + channel state; source of truth for promotion and rollback
+  type: s3                     # s3 | local (local is for development and tests)
+  bucket: CHANGE-ME-imagefactory-artifacts
+  prefix: ""
+  region: us-east-1
+  local_path: .imagefactory-store
+
+signing:
+  tool: cosign
+  key_ref: awskms:///alias/imagefactory-signing     # created by terraform/aws-bootstrap
+
+# ---------------------------------------------------------------------------------------
+# Platforms. AWS is the primary target; the rest are optional and off by default.
+# A flavor is built for platform P only if the flavor lists P AND P is enabled here.
+# ---------------------------------------------------------------------------------------
+platforms:
+  aws:
+    enabled: true
+    regions: [us-east-1, us-west-2]      # first region is where Packer builds; the rest get copies
+    ssm_prefix: /imagefactory            # channel pointers: <prefix>/<flavor>/<channel>/ami_id
+    share_with_accounts: []              # account IDs allowed to launch the AMIs (needs a CMK, see below)
+    build_vpc_id: ""                     # build in a private subnet reachable from the agent
+    build_subnet_id: ""
+    ssh_interface: ""                    # "private_ip" when the agent is inside the VPC
+    restrict_build_sg_to_runner_ip: false  # true on GitHub-hosted runners: SSH/WinRM open only to the runner's public IP
+    ebs_kms_key_id: ""                   # customer-managed key; required to share encrypted AMIs cross-account
+    region_kms_key_ids: {}               # {us-west-2: <key arn>} one CMK per replica region
+    smoke_test:                          # boot-and-join test, run from the distributed AMI in every region
+      subnet_ids: {}                     # {us-east-1: subnet-..., us-west-2: subnet-...}  (CHANGE-ME)
+      instance_types: {x86_64: t3.small, arm64: t4g.small}
+      instance_profile: ""               # role with AmazonSSMManagedInstanceCore; set it to also require SSM registration
+      timeout_seconds: 600
+
+  azure:
+    enabled: false
+    subscription_id: CHANGE-ME
+    build_resource_group: imagefactory-build
+    gallery_resource_group: imagefactory-gallery
+    gallery_name: imagefactory
+    replication_regions: [eastus2]       # only regions that are actually used (replication costs money)
+
+  gcp:
+    enabled: false
+    project_id: CHANGE-ME
+    zone: us-central1-a
+    image_storage_locations: [us]
+
+  vmware:
+    enabled: false
+    vcenter: vcenter.example.internal
+    datacenter: CHANGE-ME
+    cluster: CHANGE-ME
+    datastore: CHANGE-ME
+    build_folder: imagefactory-build
+    content_library: imagefactory
+
+# ---------------------------------------------------------------------------------------
+# Image flavors (one OS flavor = one versioned, signed image)
+# ---------------------------------------------------------------------------------------
+images:
+  # Architecture is part of the flavor: al2023 (x86_64) and al2023arm (Graviton) are separate flavors with
+  # separate versions, channels and manifests, so a consumer can never resolve the wrong CPU architecture.
+  # `arch` defaults to x86_64. arm64 is supported for Linux on AWS only (validated at config load).
+  al2023:
+    os_family: linux
+    arch: x86_64
+    description: Amazon Linux 2023 (CIS Level 1)
+    platforms: [aws]
+    cis_role: AMAZON2023-CIS
+    aws:
+      source_ami_name: "al2023-ami-2023.*-kernel-*-{arch}"   # {arch} comes from the flavor's arch
+      source_ami_owner: amazon
+      ssh_user: ec2-user
+      instance_type: t3.medium
+
+  al2023arm:
+    os_family: linux
+    arch: arm64
+    description: Amazon Linux 2023 on Graviton (CIS Level 1)
+    platforms: [aws]
+    cis_role: AMAZON2023-CIS
+    aws:
+      source_ami_name: "al2023-ami-2023.*-kernel-*-{arch}"
+      source_ami_owner: amazon
+      ssh_user: ec2-user
+
+  rhel9:
+    os_family: linux
+    arch: x86_64
+    description: Red Hat Enterprise Linux 9 (CIS Level 1)
+    platforms: [aws, azure, gcp, vmware]
+    cis_role: RHEL9-CIS
+    aws:
+      source_ami_name: "RHEL-9.*_HVM-*-{arch}-*-Hourly2-GP3"
+      source_ami_owner: "309956199498"     # Red Hat
+      ssh_user: ec2-user
+    azure: {publisher: RedHat, offer: RHEL, sku: 9-lvm-gen2}
+    gcp: {source_image_family: rhel-9, source_image_project: rhel-cloud}
+    vmware: {template: CHANGE-ME-rhel9-base, ssh_user: root}
+
+  win2022:
+    os_family: windows
+    description: "Windows Server 2022 (CIS Level 1) - scaffold, see docs/PLATFORMS.md"
+    platforms: [aws, azure]
+    aws:
+      source_ami_name: "Windows_Server-2022-English-Full-Base-*"
+      source_ami_owner: amazon
+      instance_type: t3.large
+    azure: {publisher: MicrosoftWindowsServer, offer: WindowsServer, sku: 2022-datacenter-g2, vm_size: Standard_D4s_v5}
+
+# ---------------------------------------------------------------------------------------
+# Promotion policy
+# ---------------------------------------------------------------------------------------
+promotion:
+  required_gates:
+    dev: []                                   # build + lint passing is implied by having a manifest
+    canary: [goss, compliance, vuln_scan, secrets, sbom, smoke]
+    stable: [goss, compliance, vuln_scan, secrets, sbom, smoke]
+  bake_business_days: {canary: 5}
+  expedited_bake_business_days: 1             # critical-CVE path: shortened, never skipped
+  compliance_min_score: 0.90                  # agree with Security; deviations go in config/exceptions.yaml
+
+schedule:
+  # The monthly build is due from the build day (Patch Tuesday + 2 business days) until a build of the
+  # flavor has been released that month. A failed or missed run is retried by the daily trigger, up to
+  # this many attempts, then the run alerts instead of silently doing nothing.
+  max_attempts_per_month: 3
+
+retention:
+  unreleased_grace_days: 7                    # builds that never released (gate failed) are cleaned up after this
+  deprecated_grace_days: 60                   # N and N-1 are supported; older versions deprecate, then are removed

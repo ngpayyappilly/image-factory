@@ -1,0 +1,143 @@
+# Plan -> build -> release (per flavor) -> dev. Promotion to canary/stable is pipelines/promote.yml.
+#
+# Variable group `imagefactory` (Library) must define: BUILDER_ROLE_ARN, AWS_DEFAULT_REGION,
+# TOOL_URLS_JSON, TOOL_SHA256_JSON (pinned goss/trivy/syft by architecture, see README). No secrets live here.
+#
+# The pool needs python3, git and the AWS CLI. Packer and cosign are installed by scripts/install-tools.sh
+# (pinned, checksum-verified).
+trigger: none
+
+schedules:
+  # Daily. A flavor stays *due* from the monthly build day (Patch Tuesday + 2 business days) until a build has
+  # been released that month, so a failed or missed run is retried here; after max_attempts_per_month the
+  # Alert stage fails the run loudly.
+  - cron: "0 6 * * 1-5"
+    displayName: Monthly build (due flavors only)
+    branches: { include: [main] }
+    always: true
+
+parameters:
+  - name: flavors
+    displayName: Manual run - flavors to build (comma separated, empty = all)
+    type: string
+    default: ""
+  - name: reason
+    displayName: Manual run - why (manual / critical-cve / baseline-change / new-os-minor)
+    type: string
+    default: manual
+
+variables:
+  - group: imagefactory
+  - name: lockOwner
+    value: ado-$(Build.BuildId)
+
+pool:
+  name: imagefactory-agents      # self-hosted, inside the network; no inbound access
+
+stages:
+  - stage: Plan
+    jobs:
+      - job: plan
+        steps:
+          - script: |
+              python3 -m venv .venv && .venv/bin/pip install -q -e .
+              echo "##vso[task.prependpath]$PWD/.venv/bin"
+            displayName: Install CLI
+          - script: |
+              set -euo pipefail
+              eval "$(scripts/assume-role.sh "$BUILDER_ROLE_ARN" "plan-$(Build.BuildId)")"
+              # One build run at a time (Azure DevOps has no concurrency groups). Waits up to 30 minutes, then
+              # fails; a killed run cannot block forever because the lock expires.
+              imagefactory lock acquire --name build --owner "$(lockOwner)" --ttl-minutes 360 --wait-minutes 30
+              if [ "$(Build.Reason)" = Schedule ]; then
+                echo "Scheduled run: planning only the flavors whose monthly build is due."
+                imagefactory plan --scheduled --run-id "$(Build.BuildId)" --ado-variable matrix
+              else
+                echo "Manual run (${{ parameters.reason }}) requested by $(Build.RequestedForEmail)"
+                imagefactory plan --flavors "${{ parameters.flavors }}" --run-id "$(Build.BuildId)" --ado-variable matrix
+              fi
+            name: plan
+            displayName: Lock and plan versions
+
+  # Fails the run (and so notifies) when a flavor used up its retries this month. Independent of the build.
+  - stage: Alert
+    dependsOn: Plan
+    condition: and(succeeded('Plan'), ne(dependencies.Plan.outputs['plan.plan.exhausted'], ''))
+    jobs:
+      - job: exhausted
+        variables:
+          exhausted: $[ stageDependencies.Plan.plan.outputs['plan.exhausted'] ]
+        steps:
+          - script: |
+              echo "##vso[task.logissue type=error]Monthly build exhausted its retries for: $EXHAUSTED. Investigate, then run the pipeline manually."
+              exit 1
+            env:
+              EXHAUSTED: $(exhausted)
+            displayName: Monthly build did not succeed
+
+  - stage: Build
+    dependsOn: Plan
+    condition: and(succeeded('Plan'), eq(dependencies.Plan.outputs['plan.plan.build'], 'true'))
+    jobs:
+      - job: build
+        timeoutInMinutes: 120
+        strategy:
+          matrix: $[ stageDependencies.Plan.plan.outputs['plan.matrix'] ]
+          maxParallel: 2
+        steps:
+          - script: |
+              python3 -m venv .venv && .venv/bin/pip install -q -e . ansible-core
+              echo "##vso[task.prependpath]$PWD/.venv/bin"
+              scripts/install-tools.sh packer
+            displayName: Install tooling
+          - script: |
+              set -euo pipefail
+              eval "$(scripts/assume-role.sh "$BUILDER_ROLE_ARN" "build-$(Build.BuildId)-$(platform)")"
+              export IMAGEFACTORY_AUTHOR="$(Build.RequestedForEmail)" IMAGEFACTORY_RUN_ID="$(Build.BuildId)"
+              scripts/build.sh "$(flavor)" "$(platform)" "$(version)"
+            displayName: Build $(flavor) on $(platform) as $(version)
+          - publish: artifacts/reports
+            artifact: reports-$(flavor)-$(platform)
+            condition: always()
+            displayName: Keep gate evidence
+
+  - stage: Release
+    dependsOn: [Plan, Build]
+    # Runs even if some builds failed: `release` judges each flavor on its own (all platform builds recorded and
+    # every gate green) and releases the ready ones. A flavor that is not ready is reported and makes this stage
+    # fail, but never blocks the others.
+    condition: and(not(canceled()), eq(dependencies.Plan.outputs['plan.plan.build'], 'true'))
+    jobs:
+      - job: release
+        variables:
+          matrix: $[ stageDependencies.Plan.plan.outputs['plan.matrix'] ]
+        steps:
+          - script: |
+              python3 -m venv .venv && .venv/bin/pip install -q -e .
+              echo "##vso[task.prependpath]$PWD/.venv/bin"
+              scripts/install-tools.sh cosign
+            displayName: Install CLI and cosign
+          - script: |
+              set -euo pipefail
+              eval "$(scripts/assume-role.sh "$BUILDER_ROLE_ARN" "release-$(Build.BuildId)")"
+              imagefactory release --matrix "$MATRIX" --run-id "$(Build.BuildId)"
+            env:
+              MATRIX: $(matrix)
+            displayName: Smoke test, sign and publish ready flavors to dev
+
+  # Always release the lock, even if the run failed. (A hard-killed run is covered by the lock's expiry.)
+  - stage: Unlock
+    dependsOn: [Plan, Build, Release]
+    condition: always()
+    jobs:
+      - job: unlock
+        steps:
+          - script: |
+              python3 -m venv .venv && .venv/bin/pip install -q -e .
+              echo "##vso[task.prependpath]$PWD/.venv/bin"
+            displayName: Install CLI
+          - script: |
+              set -euo pipefail
+              eval "$(scripts/assume-role.sh "$BUILDER_ROLE_ARN" "unlock-$(Build.BuildId)")"
+              imagefactory lock release --name build --owner "$(lockOwner)"
+            displayName: Release build lock

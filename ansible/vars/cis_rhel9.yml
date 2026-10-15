@@ -1,0 +1,3 @@
+---
+# Overrides passed to the RHEL9-CIS role. See cis_al2023.yml for the rules of use.
+cis_overrides_loaded: true
