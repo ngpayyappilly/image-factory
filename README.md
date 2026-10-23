@@ -32,6 +32,21 @@ make check      # unit tests, packer validate (every flavor × platform), ansibl
    *(Azure DevOps option)* create the pipelines from `pipelines/` (variable group `imagefactory`, environments
    `imagefactory-canary` and `imagefactory-stable` with approvals, self-hosted pool `imagefactory-agents`).
 
+## Real runs: keep environment values out of Git
+
+Account IDs, bucket names, subnets and tool pins are environment-specific. Put them in files that Git ignores and point the CLI at them:
+
+```bash
+export IMAGEFACTORY_CONFIG=config/images.local.yaml     # also honoured by scripts/build.sh; --config still wins
+set -a; source tool-pins.local.env; set +a              # TOOL_URLS_JSON / TOOL_SHA256_JSON (per CPU architecture)
+export AWS_PROFILE=<your profile>
+make build FLAVOR=al2023 PLATFORM=aws
+```
+
+`config/*.local.yaml`, `*.local.env` and `*.tfvars` are gitignored. Generate `images.local.yaml` from `config/images.yaml` and override `store`, `platforms.aws.regions`,
+`ebs_kms_key_id` and `smoke_test.subnet_ids`; pin the tools with the checksums from the publishers (see `scripts/install-tools.sh` for how the other pins were verified).
+Use one region while testing (cheaper and faster). A deployment that commits its own values should do so in a private repository.
+
 ## GitHub Actions
 
 `.github/workflows/`: `ci.yml` (`make check` on every PR; make it a required check), `build.yml` (plan → build matrix → boot smoke test, sign, publish to dev), `promote.yml`

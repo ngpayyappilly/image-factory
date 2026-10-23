@@ -1,4 +1,8 @@
 .venv/
+# Environment-specific config for real runs (account IDs, buckets, subnets, tool pins); see README "Real runs"
+config/*.local.yaml
+config/*.local.yml
+*.local.env
 __pycache__/
 *.egg-info/
 .pytest_cache/
@@ -9,3 +13,4 @@ ansible/external/
 .terraform.lock.hcl
 *.tfstate*
 *.pkrvars.json
+*.tfvars
