@@ -51,6 +51,12 @@ jobs:
       id-token: write
       contents: read
     steps:
+      # Fail fast and clearly on a manual run of an unconfigured repository (instead of a cryptic error from the sign-in action).
+      - name: Check configuration
+        if: ${{ vars.PROMOTER_ROLE_ARN == '' || vars.AWS_REGION == '' }}
+        run: |
+          echo "::error title=Repository not configured::Set the repository variables PROMOTER_ROLE_ARN (promoter role) and AWS_REGION, then run again. See README: GitHub Actions."
+          exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
