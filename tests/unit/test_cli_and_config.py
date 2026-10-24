@@ -163,8 +163,8 @@ def test_aws_packer_vars_follow_the_architecture(cfg):
     aws = get_platform("aws", cfg)
     arm = aws.packer_vars(cfg.image("al2023arm"), Version.parse("al2023arm-20261112.1"))
     x86 = aws.packer_vars(cfg.image("al2023"), Version.parse("al2023-20261112.1"))
-    assert arm["aws_source_ami_name"] == "al2023-ami-2023.*-kernel-*-arm64" and arm["aws_instance_type"] == "t4g.medium"
-    assert x86["aws_source_ami_name"] == "al2023-ami-2023.*-kernel-*-x86_64" and x86["aws_instance_type"] == "t3.medium"
+    assert arm["aws_source_ami_name"] == "al2023-ami-2023.*-kernel-6.18-arm64" and arm["aws_instance_type"] == "t4g.medium"
+    assert x86["aws_source_ami_name"] == "al2023-ami-2023.*-kernel-6.18-x86_64" and x86["aws_instance_type"] == "t3.medium"
 
 
 def test_cli_packer_vars_and_matrix_carry_architecture(local_cfg, capsys):
@@ -185,3 +185,23 @@ def test_architecture_is_part_of_the_signed_identity():
               author="a", created_at="2026-11-12T00:00:00Z", images={"aws": {"r": "ami-1"}})
     assert mf.Manifest(arch="arm64", **kw).canonical_bytes() != mf.Manifest(arch="x86_64", **kw).canonical_bytes()
     assert mf.Manifest(**kw).arch == "x86_64"        # manifests written before this field existed still load
+
+
+def test_config_path_comes_from_the_flag_then_the_environment_then_the_shipped_file(tmp_path, monkeypatch):
+    import yaml
+    raw = yaml.safe_load(open("config/images.yaml"))
+    raw["baseline_version"] = "from-env"
+    (tmp_path / "images.local.yaml").write_text(yaml.safe_dump(raw))
+    assert Config.load().baseline_version != "from-env"                       # shipped default
+    monkeypatch.setenv("IMAGEFACTORY_CONFIG", str(tmp_path / "images.local.yaml"))
+    assert Config.load().baseline_version == "from-env"                       # environment variable
+    raw["baseline_version"] = "from-flag"
+    (tmp_path / "other.yaml").write_text(yaml.safe_dump(raw))
+    assert Config.load(tmp_path / "other.yaml").baseline_version == "from-flag"   # explicit path wins
+
+
+def test_amazon_linux_source_images_pin_the_kernel_stream(cfg):
+    # Unpinned, the filter matched kernel 6.1, 6.12 and 6.18 AMIs created seconds apart (non-deterministic base image).
+    for flavor in ("al2023", "al2023arm"):
+        name = cfg.image(flavor)["aws"]["source_ami_name"]
+        assert "kernel-6.18-{arch}" in name and "kernel-*" not in name
