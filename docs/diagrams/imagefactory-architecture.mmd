@@ -1,0 +1,38 @@
+%%{init: {"theme": "base", "flowchart": {"curve": "basis", "nodeSpacing": 40, "rankSpacing": 50, "padding": 14}, "themeVariables": {"fontFamily": "Helvetica, Arial, sans-serif", "fontSize": "16px", "primaryColor": "#f1f5f9", "primaryBorderColor": "#94a3b8", "primaryTextColor": "#0f172a", "lineColor": "#475569", "clusterBkg": "#ffffff", "clusterBorder": "#cbd5e1"}}}%%
+graph TB
+  subgraph R1["1. Build once, from Git"]
+    direction LR
+    GIT["Git<br/>config, Packer,<br/>Ansible, tests"] --> CI["CI<br/>GitHub Actions or<br/>Azure DevOps"] --> PK["Packer<br/>ephemeral VM +<br/>CIS hardening"]
+  end
+  subgraph R2["2. Publish the same image to any cloud"]
+    direction TB
+    AWS["AWS<br/>AMI<br/>x86_64 + Graviton"]
+    AZ["Azure<br/>Compute Gallery"]
+    GCP["GCP<br/>Compute image"]
+    VMW["VMware<br/>Content Library"]
+  end
+  subgraph R3["3. Gate and sign"]
+    direction LR
+    G["Blocking gates<br/>goss tests, CIS score, trivy,<br/>secrets, SBOM, boot test"] --> SIGN["Signed manifest<br/>cosign + KMS"]
+  end
+  subgraph R4["4. Promote, never rebuild"]
+    direction LR
+    DEV["dev"] --> CAN["canary<br/>5-day bake"] --> STB["stable<br/>approval"] --> TF["Terraform modules<br/>launch templates"] --> VMS["Your VMs<br/>rollback = repoint"]
+  end
+  subgraph LEG["Legend"]
+    direction TB
+    L1["Run for real"]
+    L2["Implemented,<br/>not yet run for real"]
+    L3["Help wanted"]
+  end
+  R1 --> R2
+  R2 --> R3
+  R3 --> R4
+  R4 ~~~ LEG
+
+  classDef proven fill:#d1fae5,stroke:#059669,color:#064e3b,stroke-width:2px
+  classDef built fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:2px
+  classDef help fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px,stroke-dasharray:5 4
+  class AWS,L1 proven
+  class AZ,GCP,L2 built
+  class VMW,L3 help
