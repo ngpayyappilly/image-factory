@@ -84,3 +84,32 @@ def test_signing_roundtrip_and_failure_modes():
     assert m.canonical_bytes() == a
     m.images["aws"]["r"] = "ami-tampered"
     assert m.canonical_bytes() != a
+
+
+def test_ingest_finds_reports_in_a_nested_directory(tmp_path):
+    """Packer's download put the files under <dest>/imagefactory-reports/, and ingest used to look only at <dest>."""
+    from imagefactory.config import Config
+    nested = tmp_path / "amazon-ebs" / "imagefactory-reports"
+    nested.mkdir(parents=True)
+    (nested / "goss.json").write_text(json.dumps(goss([{"successful": True}])))
+    (nested / "sbom.json").write_text(json.dumps({"bomFormat": "CycloneDX", "components": [{"name": "bash"}]}))
+    out = gates.ingest(tmp_path / "amazon-ebs", Config.load())
+    assert out["goss"][0] == "pass" and out["sbom"][0] == "pass"
+
+
+def test_signing_never_touches_the_public_transparency_log():
+    """cosign uploads every signature to the public Sigstore Rekor log by default (found on the first real signing)."""
+    from imagefactory import manifest as mf, signing
+    m = mf.Manifest(version="al2023-20261112.1", flavor="al2023", baseline_version="1", commit="c", pipeline_run="1",
+                    author="a", created_at="2026-11-12T00:00:00Z", images={"aws": {"r": "ami-1"}})
+    seen = []
+
+    def run(cmd):
+        seen.append(cmd)
+        if cmd[1] == "sign-blob":
+            open(cmd[cmd.index("--output-signature") + 1], "wb").write(b"sig")
+    m.signature = signing.sign(m, "awskms:///alias/x", run=run)
+    signing.verify(m, "awskms:///alias/x", run=run)
+    sign_cmd, verify_cmd = seen
+    assert "--tlog-upload=false" in sign_cmd
+    assert "--insecure-ignore-tlog=true" in verify_cmd

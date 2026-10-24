@@ -29,6 +29,8 @@
         name: "{{ cis_role }}"
       when: cis_role | length > 0
 
+    # import_role (static) so `ansible-playbook --syntax-check` actually parses these tasks; the CIS role above has to
+    # stay dynamic because it is chosen by variable and comes from outside the repo.
     - name: ImageFactory baseline
-      ansible.builtin.include_role:
+      ansible.builtin.import_role:
         name: baseline

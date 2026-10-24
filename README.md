@@ -40,8 +40,12 @@ Account IDs, bucket names, subnets and tool pins are environment-specific. Put t
 export IMAGEFACTORY_CONFIG=config/images.local.yaml     # also honoured by scripts/build.sh; --config still wins
 set -a; source tool-pins.local.env; set +a              # TOOL_URLS_JSON / TOOL_SHA256_JSON (per CPU architecture)
 export AWS_PROFILE=<your profile>
-make build FLAVOR=al2023 PLATFORM=aws
+make build-setup                                        # once: .venv-build with Python >= 3.11 and the pinned ansible-core
+make build FLAVOR=al2023 PLATFORM=aws                   # uses .venv-build when it exists
 ```
+
+Builds need **Python >= 3.11** (the pinned `ansible-core` 2.18 requires it; the CIS roles need >= 2.16.1), so they use their own venv. `scripts/build.sh` checks this
+first and installs the pinned CIS roles and collections itself.
 
 `config/*.local.yaml`, `*.local.env` and `*.tfvars` are gitignored. Generate `images.local.yaml` from `config/images.yaml` and override `store`, `platforms.aws.regions`,
 `ebs_kms_key_id` and `smoke_test.subnet_ids`; pin the tools with the checksums from the publishers (see `scripts/install-tools.sh` for how the other pins were verified).
