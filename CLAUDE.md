@@ -21,7 +21,7 @@ make build FLAVOR=al2023 PLATFORM=aws    # REAL build: needs AWS credentials and
 | Path | What |
 |---|---|
 | `imagefactory/` | CLI + core. `channels.py` (promotion/rollback/retention rules), `release.py` (per-flavor release), `schedule.py` (monthly catch-up), `lock.py`, `gates.py` (evidence → pass/fail), `manifest.py` (manifest + per-platform build records), `store.py` (incl. conditional writes), `signing.py`, `versioning.py`, `config.py`, `cli.py` |
-| `imagefactory/platforms/` | One class per cloud behind `base.Platform`. `aws.py` and `azure.py` are complete (Azure drives the `az` CLI through an injectable runner); `optional.py` (GCP/VMware) only maps Packer vars |
+| `imagefactory/platforms/` | One class per cloud behind `base.Platform`. `aws.py`, `azure.py` and `gcp.py` are complete (Azure/GCP drive the `az`/`gcloud` CLI through an injectable runner); `optional.py` (VMware) only maps Packer vars |
 | `config/images.yaml` | Single source of truth: flavors, platforms, gate lists, bake days, retention. `exceptions.yaml` holds time-boxed gate exceptions |
 | `packer/{linux,windows}/` | One build block, one `source` per platform; select with `-only`. `packer/scripts/` run inside the build VM |
 | `ansible/`, `tests/goss/`, `tests/pester/` | Shared hardening and the test suites that produce gate evidence |
@@ -38,7 +38,7 @@ make build FLAVOR=al2023 PLATFORM=aws    # REAL build: needs AWS credentials and
 - **State is platform-neutral.** Manifests and channel pointers live in the store (S3); platforms only *project* them (AWS: SSM `<prefix>/<flavor>/<channel>/ami_id`). `_set()` projects first, then writes state, so a failed projection leaves state unchanged.
 - **Signature covers image identity only** (`Manifest.canonical_bytes` excludes gates, gate_results, signature, deprecated_at). Adding a field that changes what the image *is* changes the signed bytes; adding lifecycle state must be excluded there.
 - **Architecture is part of the flavor** (`al2023` vs `al2023arm`), never a build-time switch: versions, channels and manifests stay unambiguous. arm64 is Linux-on-AWS only and `Config.validate` enforces it; `arch` is part of the signed manifest identity. Gate-tool pins are keyed by arch (`tool_urls[arch][tool]`).
-- **Optional platforms fail loudly.** Enabling GCP/VMware (not yet implemented) must raise `PlatformNotImplemented` at promotion rather than silently skipping. Don't "fix" this by returning empty results.
+- **Optional platforms fail loudly.** Enabling VMware (not yet implemented) must raise `PlatformNotImplemented` at promotion rather than silently skipping. Don't "fix" this by returning empty results.
 - **No secrets baked or logged.** Build creds are short-lived (OIDC / assume-role); tool binaries are downloaded only with a pinned SHA256 (`gates.sh`); keep user input out of `run:` scripts in workflows (pass via `env:`).
 - **Don't weaken a gate to make something pass.** Use a time-boxed, approved entry in `config/exceptions.yaml` (needs id, gate, reason, approved_by, expires).
 
@@ -105,5 +105,4 @@ Committing and pushing still only happens when the user asks for it (or asks for
 Real-cloud and outward-facing actions are never part of routine work here. Confirm first before: `terraform apply`, `make build`, `packer build`, `imagefactory promote|rollback|release|sign`, `imagefactory retention --apply` (deregisters AMIs and deletes snapshots), or anything using real AWS credentials. Dry runs (`retention` without `--apply`, `packer validate`, `terraform validate`) are fine. Don't commit or push unless asked, and never to `main` directly (see the PR workflow above).
 
 ## Known gaps (don't assume these exist)
-
 AWS has run for real once (bootstrap, builds, gates, `release` to dev; see `docs/AWS-BOOTSTRAP.md`), but promotion to canary/stable, rollback, retention, multi-region replication, the GitHub build/promote workflows, and a CIS-hardened build completing the gates have not. Windows track is an unexecuted scaffold. GCP/VMware runtime plugins and consumer Terraform modules are not written. Not built from the plan: daily CVE detection, SLO dashboards/alerts, fleet inventory/drift report, catalog integration, the 6-hourly availability probe, Git tagging of versions. CIS coverage is a hand-written goss subset plus pinned ansible-lockdown roles (the role applies cleanly, but its own audit/score was never measured); the org's mandated standard/scanner is still an open decision. `CHANGE-ME` values in `config/images.yaml` must be filled in Phase 0.

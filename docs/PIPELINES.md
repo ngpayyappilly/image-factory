@@ -155,7 +155,8 @@ and evidence stay). Scheduled runs **apply**; manual runs are a dry run unless `
 On GitHub nothing is stored: each job exchanges its OIDC token for credentials. The trust conditions are created by
 `terraform/aws-bootstrap`. If Azure is enabled the jobs also sign in to Azure with OIDC (`azure/login`, builder identity for build and
 release, promoter identity inside the approval environments), driven by the `AZURE_*` repository variables from `terraform/azure-bootstrap`; the step is
-skipped when `AZURE_TENANT_ID` is unset. On Azure DevOps the agents' own AWS identity must be allowed to assume the two roles; credentials are
+skipped when `AZURE_TENANT_ID` is unset. GCP works the same way through `google-github-actions/auth` and Workload Identity Federation (`GCP_*` variables from
+`terraform/gcp-bootstrap`; skipped when `GCP_WORKLOAD_IDENTITY_PROVIDER` is unset). On Azure DevOps the agents' own AWS identity must be allowed to assume the two roles; credentials are
 placed straight into the step's environment, never into logs or pipeline variables.
 
 ## 7. What you must configure

@@ -53,7 +53,17 @@ platforms:
     enabled: false
     project_id: CHANGE-ME
     zone: us-central1-a
-    image_storage_locations: [us]
+    image_storage_locations: [us]        # multi-region storage for the images; also the keys recorded in the manifest
+    channel_secret_prefix: imagefactory  # channel pointers are Secret Manager secrets <prefix>-<flavor>-<channel>
+    build_subnetwork: ""                 # build VM subnet (projects/P/regions/R/subnetworks/S); empty = default network
+    build_use_internal_ip: false         # true when the runner is inside the VPC
+    build_omit_external_ip: false        # true for private builds (needs Cloud NAT or Private Google Access)
+    build_service_account: ""            # dedicated no-permission SA for the build VM (terraform output build_vm_service_account)
+    smoke_test:                          # boot test: a VM with no external IP; waits for the guest agent in the serial console
+      subnetwork: ""                     # terraform output smoke_test_subnetwork
+      machine_type: e2-medium
+      timeout_seconds: 600
+      boot_pattern: "Started .*Guest Agent"
 
   vmware:
     enabled: false

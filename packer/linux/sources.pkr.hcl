@@ -89,6 +89,13 @@ source "googlecompute" "linux" {
   machine_type            = var.gcp_machine_type
   ssh_username            = "packer"
 
+  # Private builds: a subnet, internal-IP SSH from an in-VPC runner, no external IP, and a dedicated
+  # no-permission service account for the build VM (nothing it could abuse if the build were compromised).
+  subnetwork            = var.gcp_subnetwork == "" ? null : var.gcp_subnetwork
+  use_internal_ip       = var.gcp_use_internal_ip
+  omit_external_ip      = var.gcp_omit_external_ip
+  service_account_email = var.gcp_build_service_account == "" ? null : var.gcp_build_service_account
+
   image_name              = var.gcp_image_name
   image_family            = var.flavor
   image_storage_locations = var.gcp_image_storage_locations
@@ -96,6 +103,7 @@ source "googlecompute" "linux" {
     imagefactory-version  = lower(replace(var.image_version, ".", "-"))
     imagefactory-flavor   = var.flavor
     imagefactory-baseline = lower(replace(var.baseline_version, ".", "-"))
+    imagefactory-arch     = var.architecture
   }
 }
 
