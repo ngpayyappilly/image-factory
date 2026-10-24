@@ -159,7 +159,12 @@ def cmd_gate_ingest(a, cfg):
         part.record_gate(gate, status, detail, platform=a.platform)
         print("%-11s %s  %s" % (gate, status.upper(), detail))
     mf.save_part(store, part, a.platform)
-    return 1 if any(s == "fail" for s, _ in results.values()) else 0
+    # A gate with no evidence can never pass, so the image can never release. Say so now, in the build, instead of
+    # letting the job succeed and the flavor be skipped later (a build with NO evidence used to exit 0).
+    missing = [g for g in release_mod.pre_release_gates(cfg) if g not in results]
+    for g in missing:
+        print("%-11s MISSING  no evidence found under %s" % (g, a.reports))
+    return 1 if missing or any(s == "fail" for s, _ in results.values()) else 0
 
 
 def cmd_gate_record(a, cfg):

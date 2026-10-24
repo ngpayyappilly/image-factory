@@ -40,8 +40,12 @@ Account IDs, bucket names, subnets and tool pins are environment-specific. Put t
 export IMAGEFACTORY_CONFIG=config/images.local.yaml     # also honoured by scripts/build.sh; --config still wins
 set -a; source tool-pins.local.env; set +a              # TOOL_URLS_JSON / TOOL_SHA256_JSON (per CPU architecture)
 export AWS_PROFILE=<your profile>
-make build FLAVOR=al2023 PLATFORM=aws
+make build-setup                                        # once: .venv-build with Python >= 3.11 and the pinned ansible-core
+make build FLAVOR=al2023 PLATFORM=aws                   # uses .venv-build when it exists
 ```
+
+Builds need **Python >= 3.11** (the pinned `ansible-core` 2.18 requires it; the CIS roles need >= 2.16.1), so they use their own venv. `scripts/build.sh` checks this
+first and installs the pinned CIS roles and collections itself.
 
 `config/*.local.yaml`, `*.local.env` and `*.tfvars` are gitignored. Generate `images.local.yaml` from `config/images.yaml` and override `store`, `platforms.aws.regions`,
 `ebs_kms_key_id` and `smoke_test.subnet_ids`; pin the tools with the checksums from the publishers (see `scripts/install-tools.sh` for how the other pins were verified).
@@ -126,12 +130,17 @@ imagefactory retention --flavor rhel9 [--apply]       # dry-run unless --apply
 
 ## Status: what is and is not verified
 
-Verified offline here: 51 unit tests; `packer validate` for all 7 flavor×platform combinations using vars
-generated from the config; `ansible-playbook --syntax-check`; `terraform validate` on both stacks; shell syntax.
+Verified offline (and in CI on every PR): the unit tests; `packer validate` for every flavor×platform; `ansible-playbook --syntax-check`;
+`terraform validate` on every stack; shell syntax; `actionlint`.
 
-**Nothing has been run against a real AWS account yet** (no credentials in the authoring environment), so
-expect first-build friction: source AMI filters, the CIS role's variables/overrides (`ansible/vars/cis_*.yml`),
-trivy/syft flags, SSM data-type propagation delay. The GitHub workflows pass `actionlint` and the ADO YAML parses, but neither has run.
+**Run against real AWS** (one account, one region, 2026-10-23; since torn down): the bootstrap Terraform; real Packer builds that produced encrypted,
+IMDSv2-only, correctly tagged AMIs; the least-privilege builder role; the gate scripts and ingestion on real evidence; `release` (boot smoke test, KMS signing
+verified by a *separate* promoter identity, the SSM dev pointer, a `resolve:ssm:` launch); and the S3 locking and version reservation. The CIS role applied
+cleanly (`ok=425 failed=0`), but **a CIS-hardened image never completed the gates**, so its compliance score has not been measured.
+
+**Not yet run for real:** promotion to canary/stable, rollback and retention; multi-region replication (one region was tested); the SSM-join smoke check; the
+GitHub build/promote/retention workflows (OIDC sign-in, the schedules); Windows; Azure and GCP. Expect first-run friction there. The exact procedure and what it
+found are in [docs/AWS-BOOTSTRAP.md](docs/AWS-BOOTSTRAP.md).
 
 Not built yet (from the plan): daily CVE detection, SLO dashboards/alerts and structured stage events, fleet
 inventory and drift report, catalog integration, release notes/deprecation calendar tooling, the synthetic

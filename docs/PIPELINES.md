@@ -229,10 +229,10 @@ differences are authentication, how approval is enforced, and PR validation (Git
 
 ## 12. Known limitations
 
-1. **Never run against a real AWS account or CI system yet.** The GitHub workflows pass `actionlint` (and `make check` passes from a
-   clean checkout with no AWS access), the Azure DevOps YAML parses, and `scripts/install-tools.sh` was exercised against the real
-   downloads (checksum verification, extraction and tamper refusal) but not executed on a Linux agent. Expect first-run fixes (for example
-   runner network reach, tool pins, and Azure DevOps runtime-expression details).
+1. **Only `ci.yml` has run on GitHub.** The build, promote and retention workflows have never completed a run: the scheduled ones fire and **fail at
+   the AWS sign-in step because no repository variables are set** (a known issue; they should skip until configured). The AWS commands they call
+   were exercised locally against a real account (README, "Status") but not through GitHub OIDC. The Azure DevOps YAML parses but has not run, and
+   `scripts/install-tools.sh` was exercised against the real downloads (checksum verification, extraction and tamper refusal) but not on a Linux agent.
 2. **Locks rely on S3 conditional writes** (`If-None-Match` / `If-Match`), available in current S3 and boto3 (>= 1.36). They use the
    store bucket's normal write permissions. A lock held by a killed run is released only when its expiry passes (6 h for builds, 30 min
    for promotions, 60 min for retention).

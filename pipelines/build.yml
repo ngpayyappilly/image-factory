@@ -86,7 +86,7 @@ stages:
           maxParallel: 2
         steps:
           - script: |
-              python3 -m venv .venv && .venv/bin/pip install -q -e . ansible-core
+              python3 -m venv .venv && .venv/bin/pip install -q -e . -r ansible/requirements-pip.txt   # needs Python >= 3.11
               echo "##vso[task.prependpath]$PWD/.venv/bin"
               scripts/install-tools.sh packer
             displayName: Install tooling

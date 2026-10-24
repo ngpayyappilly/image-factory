@@ -1,6 +1,13 @@
 ---
-# Overrides passed to the AMAZON2023-CIS role for this flavor. Use this for rules that break the
-# build or the platform (the build user must keep SSH access until the last provisioner).
-# Every override is a documented deviation: add the reason, and an entry in config/exceptions.yaml
-# if the compliance gate would otherwise fail. Variable names come from the role's defaults/main.yml.
+# Overrides passed to the AMAZON2023-CIS role for this flavor. Use this for rules that break the build or the
+# platform (the build user must keep SSH access until the last provisioner). Every override is a documented
+# deviation: say why, and add an entry in config/exceptions.yaml if the compliance gate would otherwise fail.
+# Variable names come from the role's defaults/main/*.yml.
 cis_overrides_loaded: true
+
+# 4.6.6 "Ensure root password is set". This is the role's own pre-check and it ABORTS the run on cloud images,
+# where root has no password by design: the account is locked (`passwd -S root` reports it locked) and access
+# is by SSH key or SSM, never by root password. A locked root is at least as strong as a set one for this
+# control's intent (authenticating single-user-mode access), and instances cannot be booted into single-user
+# mode from the cloud console anyway. Not covered by the goss compliance subset, so no exception entry needed.
+amzn2023cis_rule_4_6_6: false

@@ -75,7 +75,7 @@
     content: "Authorized use only. Activity may be monitored and reported.\n"
   loop: [/etc/issue, /etc/issue.net]
 
-- name: Record image provenance on the machine (fleet inventory: which VM runs which build)
+- name: "Record image provenance on the machine (fleet inventory - which VM runs which build)"
   ansible.builtin.copy:
     dest: /etc/imagefactory-release
     owner: root
