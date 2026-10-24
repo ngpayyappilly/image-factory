@@ -264,7 +264,7 @@ Cloud specifics sit behind `Platform` (`platforms/base.py`):
 | `smoke_test(...)` | Boot the distributed image and check it comes up |
 | `deregister(...)` | Retention |
 
-AWS and Azure implement all of it. GCP and VMware implement only `packer_vars`; the rest raise `PlatformNotImplemented`, so
+AWS, Azure and GCP implement all of it. VMware implements only `packer_vars`; the rest raise `PlatformNotImplemented`, so
 enabling one builds fine but promotion fails loudly rather than silently skipping. Details and the status table are in
 [PLATFORMS.md](PLATFORMS.md).
 

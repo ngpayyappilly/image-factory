@@ -173,6 +173,23 @@ variable "gcp_machine_type" {
   type    = string
   default = "e2-medium"
 }
+variable "gcp_subnetwork" {
+  type    = string
+  default = ""
+}
+variable "gcp_use_internal_ip" {
+  type    = bool
+  default = false
+}
+variable "gcp_omit_external_ip" {
+  type    = bool
+  default = false
+}
+variable "gcp_build_service_account" {
+  type        = string
+  description = "Dedicated service account for the build VM; empty uses the project default"
+  default     = ""
+}
 variable "gcp_image_name" {
   type    = string
   default = "image-0"
