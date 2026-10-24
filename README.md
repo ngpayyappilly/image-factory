@@ -54,7 +54,7 @@ make setup && make check        # everything that runs offline, no cloud account
 # make your change on a branch, add a test with it, open a pull request
 ```
 
-`main` is protected: every change goes through a pull request and must pass the `check` and `unit-tests-py39` jobs. Read [CLAUDE.md](CLAUDE.md) for the invariants that must not be broken and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit.
+`main` is protected: every change goes through a pull request and must pass the `check` and `unit-tests-py39` jobs. See [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md) and [SECURITY.md](SECURITY.md) (report vulnerabilities privately). Read [CLAUDE.md](CLAUDE.md) for the invariants that must not be broken and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit.
 
 ## Documentation
 
