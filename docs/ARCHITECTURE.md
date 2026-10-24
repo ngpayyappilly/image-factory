@@ -347,4 +347,5 @@ flowchart TB
 
 Daily CVE detection, SLO dashboards and alerting, fleet inventory and drift report, catalog integration, the 6-hourly
 availability probe (`smoke_test` is its building block), Git tagging of versions, GCP/VMware runtime plugins, and an
-executed Windows track. Nothing has run against a real AWS account yet.
+executed Windows track. The AWS path has run against a real account once (see the README, "Status"); promotion beyond `dev`, rollback,
+retention and multi-region replication have not.

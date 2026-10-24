@@ -3,7 +3,7 @@
 Golden-image pipeline: build hardened images once with Packer, gate them, sign them, and promote the
 same artifact through dev → canary → stable. **AWS (AMIs) is the primary platform.** Azure, GCP and
 VMware are optional, off by default, and only partly implemented. Design source:
-`ImageFactory Design and Implementation Plan.pdf` (repo root). User docs: `README.md`, `docs/ARCHITECTURE.md` (how the pieces fit, state model, trust model), `docs/PIPELINES.md` (how the CI workflows are designed), `docs/PLATFORMS.md`. Keep PIPELINES.md in step with the workflows and ARCHITECTURE.md in step when you change promotion rules, the manifest, or the trust model.
+`ImageFactory Design and Implementation Plan.pdf` (repo root). User docs: `README.md`, `docs/ARCHITECTURE.md` (how the pieces fit, state model, trust model), `docs/PIPELINES.md` (how the CI workflows are designed), `docs/PLATFORMS.md`, `docs/AWS-BOOTSTRAP.md` (the bootstrap, test and teardown procedure that was run for real, and what it found). Keep PIPELINES.md in step with the workflows and ARCHITECTURE.md in step when you change promotion rules, the manifest, or the trust model.
 
 ## Commands
 
@@ -59,6 +59,10 @@ make build FLAVOR=al2023 PLATFORM=aws    # REAL build: needs AWS credentials and
 - Azure gallery versions must be `Major.Minor.Patch` and GCE names can't contain dots: use `Version.azure` / `Version.gcp`; the canonical string lives in a tag/label.
 - `make` resolves simple commands with its own PATH, so Makefile recipes use `$(VENV)/bin/...`.
 - Lock and version reservation need S3 conditional writes (boto3 >= 1.36); `LocalStore` emulates them for tests.
+- A custom Packer `execute_command` REPLACES the default and drops `environment_vars` unless it contains `{{ .Vars }}`. A directory upload needs an existing destination directory; a directory download nests the remote directory's name (so `gate-ingest` searches recursively).
+- cosign publishes every signature to the public Sigstore log by default; signing here passes `--tlog-upload=false` (verify: `--insecure-ignore-tlog=true`).
+- Long local builds die if the laptop sleeps (the SSH session breaks; Packer survives but the build is stuck): use `caffeinate`, or CI. SSH latency to a far region (about 340 ms to Mumbai from the US) makes Ansible ~14 s per task: build near the runner.
+- A role assumed from an SSO session is capped at 1 hour (role chaining). Long local builds use a profile with `source_profile` + `role_arn`, which refreshes.
 - `git ls-remote` shows the tag object for annotated tags; use the `^{}` line for the commit SHA.
 
 ## Skills to use
@@ -92,6 +96,7 @@ Not relevant here (different tools): `aws-cdk`, `aws-cloudformation`, `aws-deplo
 3. Commit with a clear message (end it with the attribution line from the session), push the **branch**, and open the PR with `gh pr create` (end the description with the attribution line). Say what changed, why, and what was and was not verified.
 4. Wait for CI to pass. **Do not merge unless the user asks**; the user decides when.
 5. Applies to docs and config changes too. Keep PRs focused; one concern per PR.
+6. **Do not stack PRs** (a PR whose base is another feature branch). If you must: merge the TOP PR first, or retarget it to `main` before merging the base. #6 was stacked on #5, #5 merged first, and #6's fixes landed on an already-merged branch and never reached `main` (found by checking `git merge-base --is-ancestor <fix commit> origin/main`). After any merge, verify the change is actually on `main`.
 
 Committing and pushing still only happens when the user asks for it (or asks for a change that is meant to land). When they do, that means a branch and a PR.
 
@@ -101,4 +106,4 @@ Real-cloud and outward-facing actions are never part of routine work here. Confi
 
 ## Known gaps (don't assume these exist)
 
-Never run against real AWS. Windows track is an unexecuted scaffold. GCP/VMware runtime plugins and consumer Terraform modules are not written. Not built from the plan: daily CVE detection, SLO dashboards/alerts, fleet inventory/drift report, catalog integration, the 6-hourly availability probe, Git tagging of versions. CIS coverage is a hand-written goss subset plus pinned ansible-lockdown roles that have not been exercised; the org's mandated standard/scanner is still an open decision. `CHANGE-ME` values in `config/images.yaml` must be filled in Phase 0.
+AWS has run for real once (bootstrap, builds, gates, `release` to dev; see `docs/AWS-BOOTSTRAP.md`), but promotion to canary/stable, rollback, retention, multi-region replication, the GitHub build/promote workflows, and a CIS-hardened build completing the gates have not. Windows track is an unexecuted scaffold. GCP/VMware runtime plugins and consumer Terraform modules are not written. Not built from the plan: daily CVE detection, SLO dashboards/alerts, fleet inventory/drift report, catalog integration, the 6-hourly availability probe, Git tagging of versions. CIS coverage is a hand-written goss subset plus pinned ansible-lockdown roles (the role applies cleanly, but its own audit/score was never measured); the org's mandated standard/scanner is still an open decision. `CHANGE-ME` values in `config/images.yaml` must be filled in Phase 0.
