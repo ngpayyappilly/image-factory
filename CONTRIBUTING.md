@@ -42,4 +42,6 @@ Anything that touches a real cloud account (`make build`, `packer build`, `terra
 
 Use the issue templates for bugs and feature requests. For a vulnerability, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
 
+Contributions are licensed under the [Apache License 2.0](LICENSE), the same as the project.
+
 Please also read the [Code of Conduct](CODE_OF_CONDUCT.md).
