@@ -17,14 +17,16 @@
     architecture: "x86_64"
     git_commit: "unknown"
     distro_releasever: ""
+    cis_vars: ""            # which ansible/vars/cis_<name>.yml to load; empty means the flavor name
+    distro_family: "redhat" # redhat | debian (the roles also branch on the gathered os_family fact)
   vars_files:
-    - "vars/cis_{{ flavor }}.yml"
+    - "vars/cis_{{ cis_vars | default(flavor, true) }}.yml"
 
   roles:
     - updates
 
   tasks:
-    - name: CIS Level 1 ({{ cis_role }})
+    - name: CIS hardening ({{ cis_role }})
       ansible.builtin.include_role:
         name: "{{ cis_role }}"
       when: cis_role | length > 0

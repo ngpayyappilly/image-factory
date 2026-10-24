@@ -11,6 +11,7 @@ import yaml
 DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "config" / "images.yaml"
 CHANNELS = ("dev", "canary", "stable")
 ARCHITECTURES = ("x86_64", "arm64")   # AWS naming; arm64 = Graviton
+DISTRO_FAMILIES = ("redhat", "debian")   # drives package manager and service/package names in the roles and goss tests
 
 
 class ConfigError(Exception):
@@ -41,6 +42,10 @@ class Config:
             arch = img.get("arch", "x86_64")
             if arch not in ARCHITECTURES:
                 raise ConfigError("image %s: arch %r is not one of %s" % (flavor, arch, ", ".join(ARCHITECTURES)))
+            if img["os_family"] == "linux":
+                fam = img.get("distro_family", "redhat")
+                if fam not in DISTRO_FAMILIES:
+                    raise ConfigError("image %s: distro_family %r is not one of %s" % (flavor, fam, ", ".join(DISTRO_FAMILIES)))
             if arch != "x86_64":
                 # Everything else (Azure/GCP/vSphere sources, Windows) is only wired for x64.
                 if img["os_family"] != "linux":
@@ -75,6 +80,14 @@ class Config:
 
     def arch(self, flavor: str) -> str:
         return self.image(flavor).get("arch", "x86_64")
+
+    def distro_family(self, flavor: str) -> str:
+        return self.image(flavor).get("distro_family", "redhat")
+
+    def cis_vars(self, flavor: str) -> str:
+        """Name of ansible/vars/cis_<name>.yml holding this flavor's CIS overrides. Flavors that differ only in CPU
+        architecture (al2023 / al2023arm) share one file."""
+        return self.image(flavor).get("cis_vars", flavor)
 
     def flavors(self) -> List[str]:
         return list(self.raw["images"])

@@ -28,7 +28,7 @@ build {
       "PROFILE_TASKS_TASK_OUTPUT_LIMIT=25",
     ]
     extra_arguments = [
-      "--extra-vars", "flavor=${var.flavor} cis_role=${var.cis_role} baseline_version=${var.baseline_version} image_version=${var.image_version} architecture=${var.architecture} git_commit=${var.git_commit} distro_releasever=${var.distro_releasever}",
+      "--extra-vars", "flavor=${var.flavor} cis_role=${var.cis_role} cis_vars=${var.cis_vars} distro_family=${var.distro_family} baseline_version=${var.baseline_version} image_version=${var.image_version} architecture=${var.architecture} git_commit=${var.git_commit} distro_releasever=${var.distro_releasever}",
     ]
   }
 
@@ -63,6 +63,7 @@ build {
       "SYFT_URL=${lookup(lookup(var.tool_urls, var.architecture, {}), "syft", "")}",
       "SYFT_SHA256=${lookup(lookup(var.tool_sha256, var.architecture, {}), "syft", "")}",
       "FLAVOR=${var.flavor}",
+      "DISTRO_FAMILY=${var.distro_family}",
     ]
     # Test failures must not abort the build: the gates are evaluated from the evidence
     # afterwards (imagefactory gate-ingest) so a failing image is still recorded and traceable.

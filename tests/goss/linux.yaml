@@ -1,6 +1,7 @@
 # Functional and provenance checks: "is this a sane, sealed, correctly-built image?"
 # Run inside the build VM by packer/scripts/linux/gates.sh -> goss.json -> `goss` gate.
-# FLAVOR is passed in the environment.
+# Rendered as a Go template. Environment: FLAVOR, and DISTRO_FAMILY (redhat | debian) which selects package and service names.
+# Keep every resource type under ONE top-level key: goss silently drops all but the last duplicate.
 
 file:
   /etc/imagefactory-release:
@@ -27,16 +28,43 @@ command:
     exec: sshd -t -h /tmp/imagefactory-tools/hostkey
     exit-status: 0
   no-pending-security-updates:
-    exec: sh -c 'dnf -q check-update --security; test $? -ne 100'
+{{ if eq .Env.DISTRO_FAMILY "debian" }}
+    # cleanup.sh removed apt's package lists, so refresh them first; otherwise "nothing to upgrade" would pass vacuously.
+    exec: >-
+      sh -c 'apt-get -qq update && ! apt-get -s -o Debug::NoLocking=1 dist-upgrade | grep -E "^Inst .*-security"'
+{{ else }}
+    exec: >-
+      sh -c 'dnf -q check-update --security; test $? -ne 100'
+{{ end }}
     exit-status: 0
-    timeout: 120000
+    timeout: 300000
+{{ if eq .Env.DISTRO_FAMILY "debian" }}
+  sshd-enabled:
+    # Ubuntu 24.04 starts sshd by socket activation (ssh.socket), so ssh.service itself may report "disabled".
+    exec: >-
+      sh -c 'systemctl is-enabled ssh.socket ssh.service 2>/dev/null | grep -qx enabled'
+    exit-status: 0
+{{ end }}
 
 package:
   cloud-init:
     installed: true
-  audit:
-    installed: true
   chrony:
+    installed: true
+{{ if eq .Env.DISTRO_FAMILY "debian" }}
+  auditd:
+    installed: true
+  # Insecure legacy services must not be present.
+  telnetd:
+    installed: false
+  rsh-server:
+    installed: false
+  nis:
+    installed: false
+  tftpd-hpa:
+    installed: false
+{{ else }}
+  audit:
     installed: true
   # Insecure legacy services must not be present.
   telnet-server:
@@ -47,19 +75,24 @@ package:
     installed: false
   tftp-server:
     installed: false
+{{ end }}
 
 service:
-  sshd:
-    enabled: true
   auditd:
-    enabled: true
-  chronyd:
     enabled: true
   cloud-init:
     enabled: true
-
-{{ if eq .Env.FLAVOR "al2023" }}
-  # Amazon Linux ships the SSM agent; fleet patching and Session Manager depend on it.
+{{ if eq .Env.DISTRO_FAMILY "debian" }}
+  chrony:
+    enabled: true
+{{ else }}
+  sshd:
+    enabled: true
+  chronyd:
+    enabled: true
+{{ if hasPrefix "al2023" .Env.FLAVOR }}
+  # Amazon Linux ships the SSM agent (al2023 AND al2023arm); fleet patching and Session Manager depend on it.
   amazon-ssm-agent:
     enabled: true
+{{ end }}
 {{ end }}

@@ -19,6 +19,16 @@ variable "cis_role" {
   type    = string
   default = ""
 }
+variable "distro_family" {
+  type        = string
+  description = "redhat or debian: selects package manager and service/package names in the roles and goss tests"
+  default     = "redhat"
+}
+variable "cis_vars" {
+  type        = string
+  description = "Name of ansible/vars/cis_<name>.yml with this flavor's CIS overrides (defaults to the flavor)"
+  default     = ""
+}
 variable "architecture" {
   type        = string
   description = "CPU architecture of this flavor: x86_64 or arm64 (AWS naming)"

@@ -4,6 +4,7 @@
 # Open item: Security may mandate a specific scanner/standard. If so, replace this file with
 # that scanner's output in goss JSON format (or add a parser in imagefactory/gates.py) and
 # keep the gate name `compliance`. `meta.id` is what config/exceptions.yaml refers to.
+# Rendered as a Go template: .Env.DISTRO_FAMILY (redhat|debian) selects distro-specific expectations.
 
 command:
   sshd-root-login:
@@ -79,9 +80,15 @@ file:
   /etc/shadow:
     exists: true
     meta: {id: cis-perm-shadow}
-    mode: "0000"
+{{ if eq .Env.DISTRO_FAMILY "debian" }}
+    mode: "0640"          # Debian family: root:shadow 0640 (CIS Ubuntu)
+    owner: root
+    group: shadow
+{{ else }}
+    mode: "0000"          # RHEL family: root:root 0000
     owner: root
     group: root
+{{ end }}
   /etc/group:
     exists: true
     meta: {id: cis-perm-group}
@@ -97,7 +104,11 @@ service:
   auditd:
     meta: {id: cis-audit-enabled}
     enabled: true
+{{ if eq .Env.DISTRO_FAMILY "debian" }}
+  chrony:
+{{ else }}
   chronyd:
+{{ end }}
     meta: {id: cis-time-sync}
     enabled: true
   rpcbind:

@@ -84,10 +84,19 @@ images:
   # Amazon Linux 2023 publishes SEVERAL kernel streams (6.1, 6.12, 6.18) with near-identical timestamps; an unpinned
   # filter picks whichever is newest by seconds, so the base image would be non-deterministic. Pin the stream
   # deliberately (6.18 is AWS's current default, `al2023-ami-kernel-default`) and change it as a reviewed edit.
+  #
+  # CIS hardening comes from the pinned ansible-lockdown roles. NOTE ON LEVELS: those roles apply Level 1 AND Level 2 rules by
+  # default (their `*_level_1/_level_2` switches only steer the audit output, not remediation), so the descriptions below say
+  # "CIS (ansible-lockdown)" and not "Level 1". Restricting remediation to Level 1 needs tag filtering that has not been verified
+  # in a real build; until then treat a flavor as "the role's full default profile plus our baseline".
+  #
+  # distro_family (redhat|debian, default redhat) selects the package manager and service/package names; cis_vars names
+  # ansible/vars/cis_<name>.yml (default: the flavor), so flavors that differ only in CPU architecture share one file.
   al2023:
     os_family: linux
+    distro_family: redhat
     arch: x86_64
-    description: Amazon Linux 2023 (CIS Level 1)
+    description: Amazon Linux 2023 (CIS via ansible-lockdown)
     platforms: [aws]
     cis_role: AMAZON2023-CIS
     aws:
@@ -98,10 +107,12 @@ images:
 
   al2023arm:
     os_family: linux
+    distro_family: redhat
     arch: arm64
-    description: Amazon Linux 2023 on Graviton (CIS Level 1)
+    description: Amazon Linux 2023 on Graviton (CIS via ansible-lockdown)
     platforms: [aws]
     cis_role: AMAZON2023-CIS
+    cis_vars: al2023                      # same overrides as the x86_64 flavor (there was no cis_al2023arm.yml, so this flavor could not have built)
     aws:
       source_ami_name: "al2023-ami-2023.*-kernel-6.18-{arch}"
       source_ami_owner: amazon
@@ -109,8 +120,9 @@ images:
 
   rhel9:
     os_family: linux
+    distro_family: redhat
     arch: x86_64
-    description: Red Hat Enterprise Linux 9 (CIS Level 1)
+    description: Red Hat Enterprise Linux 9 (CIS via ansible-lockdown)
     platforms: [aws, azure, gcp, vmware]
     cis_role: RHEL9-CIS
     aws:
@@ -120,6 +132,38 @@ images:
     azure: {publisher: RedHat, offer: RHEL, sku: 9-lvm-gen2}
     gcp: {source_image_family: rhel-9, source_image_project: rhel-cloud}
     vmware: {template: CHANGE-ME-rhel9-base, ssh_user: root}
+
+  # Ubuntu 24.04 LTS. Canonical publishes amd64 and arm64 on every platform we target; we build both on AWS (x86_64 + Graviton)
+  # and x86_64 only elsewhere, matching the rule that arm64 is Linux-on-AWS only. 26.04 LTS exists but has no ansible-lockdown
+  # CIS role to pin yet, and 22.04 uses a different AMI naming scheme (hvm-ssd, not hvm-ssd-gp3), so 24.04 is the one supported LTS.
+  # {deb_arch} is Canonical's name for the architecture (amd64|arm64), {arch} is EC2's (x86_64|arm64).
+  ubuntu2404:
+    os_family: linux
+    distro_family: debian
+    arch: x86_64
+    description: Ubuntu 24.04 LTS (CIS via ansible-lockdown)
+    platforms: [aws, azure, gcp, vmware]
+    cis_role: UBUNTU24-CIS
+    aws:
+      source_ami_name: "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-{deb_arch}-server-*"
+      source_ami_owner: "099720109477"     # Canonical
+      ssh_user: ubuntu
+    azure: {publisher: Canonical, offer: ubuntu-24_04-lts, sku: server}
+    gcp: {source_image_family: ubuntu-2404-lts-amd64, source_image_project: ubuntu-os-cloud}
+    vmware: {template: CHANGE-ME-ubuntu2404-base, ssh_user: ubuntu}
+
+  ubuntu2404arm:
+    os_family: linux
+    distro_family: debian
+    arch: arm64
+    description: Ubuntu 24.04 LTS on Graviton (CIS via ansible-lockdown)
+    platforms: [aws]
+    cis_role: UBUNTU24-CIS
+    cis_vars: ubuntu2404
+    aws:
+      source_ami_name: "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-{deb_arch}-server-*"
+      source_ami_owner: "099720109477"     # Canonical
+      ssh_user: ubuntu
 
   win2022:
     os_family: windows

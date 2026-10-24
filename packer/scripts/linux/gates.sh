@@ -42,8 +42,10 @@ ssh-keygen -q -t ed25519 -N '' -f "$T/hostkey"
 
 # goss exits non-zero on failing tests; we want the report either way.
 if [ -x "$T/goss" ]; then
-  FLAVOR="${FLAVOR:-}" "$T/goss" --gossfile "$G/linux.yaml" validate --format json > "$R/goss.json" || true
-  FLAVOR="${FLAVOR:-}" "$T/goss" --gossfile "$G/cis.yaml"   validate --format json > "$R/compliance.json" || true
+  # The goss files are templates: package/service names and file modes differ between RHEL-family and Debian-family.
+  export FLAVOR="${FLAVOR:-}" DISTRO_FAMILY="${DISTRO_FAMILY:-redhat}"
+  "$T/goss" --gossfile "$G/linux.yaml" validate --format json > "$R/goss.json" || true
+  "$T/goss" --gossfile "$G/cis.yaml"   validate --format json > "$R/compliance.json" || true
 fi
 
 SKIP="/proc,/sys,/dev,/run,$T,$R,$G"

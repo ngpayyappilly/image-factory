@@ -83,11 +83,42 @@ Implement `imagefactory/platforms/base.py::Platform`: `images_from_packer`, `ver
 (S3), so a plugin only *projects* it (Azure uses tags on the gallery image definition; vSphere could repoint a Content Library item). Azure and
 GCP are the complete examples after AWS: copy their shape (injectable CLI runner, deterministic image references, fakes in the tests).
 
-## CPU architecture
+## Operating systems and CPU architectures
+
+| Flavor | OS | Architecture | Platforms it can target | Proven for real |
+|---|---|---|---|---|
+| `al2023` | Amazon Linux 2023 | x86_64 | AWS | yes (without the CIS role through the gates; the CIS role applied cleanly) |
+| `al2023arm` | Amazon Linux 2023 | arm64 | AWS | no |
+| `rhel9` | RHEL 9 | x86_64 | AWS, Azure, GCP, VMware | no |
+| `ubuntu2404` | Ubuntu 24.04 LTS | x86_64 | AWS, Azure, GCP, VMware | no |
+| `ubuntu2404arm` | Ubuntu 24.04 LTS | arm64 | AWS | no |
+| `win2022` | Windows Server 2022 | x86_64 | AWS, Azure | no (scaffold) |
+
 | Architecture | AWS | Azure / GCP / VMware |
 |---|---|---|
-| x86_64 | ✅ `al2023`, `rhel9`, `win2022` | ✅ (Packer builds) |
-| arm64 (Graviton) | ✅ `al2023arm` (Linux only) | ❌ rejected at config load |
+| x86_64 | ✅ `al2023`, `rhel9`, `ubuntu2404`, `win2022` | ✅ (Packer builds) |
+| arm64 (Graviton) | ✅ `al2023arm`, `ubuntu2404arm` (Linux only) | ❌ rejected at config load |
+
+### Ubuntu 24.04
+Both CPU architectures Canonical publishes (`amd64`, `arm64`) are supported, where our rules allow: x86_64 on every platform, arm64 on AWS only (the same
+rule as every other Linux flavor). Choices worth knowing:
+
+- **24.04 LTS only.** 26.04 LTS exists but has no ansible-lockdown CIS role to pin yet; 22.04 names its AMIs `hvm-ssd`, not `hvm-ssd-gp3`, so it needs its own
+  flavor, role pin and AMI pattern (a config block plus a vars file).
+- **AMI names** use Canonical's architecture names, so the config has a `{deb_arch}` placeholder (`amd64`/`arm64`) beside `{arch}` (`x86_64`/`arm64`).
+  Owner `099720109477` (Canonical), SSH user `ubuntu`. The filter has not been run against the live catalogue (no credentials were available): the first
+  build's AMI lookup will confirm it, and it fails in seconds if it matches nothing.
+- **CIS** is `UBUNTU24-CIS` 1.8.0. Documented deviations in `ansible/vars/cis_ubuntu2404.yml`: rule 5.2.4 is disabled (it would strip passwordless sudo from the
+  `ubuntu` user, which has no password, locking the account and failing every later task); the role's outbound firewall allowlist is replaced with
+  "all" (it would otherwise be baked into every VM launched from the image); disruptive rules are skipped; `system_is_ec2` is derived from the Packer builder.
+- **Inbound is default-deny** with OpenSSH allowed (CIS 4.2.x via `ufw`). Applications open their ports at deploy time.
+- **Not verified:** nothing has built an Ubuntu image yet. Likely first-build friction: the CIS role's behaviour on a real instance, the `cloud-init` unit name in
+  the goss check, and (on Azure) generalisation: the Linux build does not run `waagent -deprovision` for any distribution yet.
+
+### Adding another distribution
+Add a flavor block (`distro_family`, `cis_role`, per-platform source), pin its CIS role in `ansible/requirements.yml`, add `ansible/vars/cis_<name>.yml`
+with documented overrides, and extend the distro-specific package/service names if it is a new family. `make check` renders the goss tests and checks the
+config and vars files for it automatically.
 
 Architecture is per flavor; see README "CPU architectures". Adding arm64 elsewhere means arm source images, instance/VM sizes and
 tool pins for that platform, then relaxing the check in `Config.validate`.

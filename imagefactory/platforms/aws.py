@@ -17,6 +17,7 @@ from .base import Platform
 # Default build instance per CPU architecture (override per flavor with aws.instance_type).
 DEFAULT_BUILD_INSTANCE = {"x86_64": "t3.medium", "arm64": "t4g.medium"}
 DEFAULT_SMOKE_INSTANCE = {"x86_64": "t3.small", "arm64": "t4g.small"}
+DEB_ARCH = {"x86_64": "amd64", "arm64": "arm64"}
 
 
 class AwsPlatform(Platform):
@@ -44,7 +45,8 @@ class AwsPlatform(Platform):
         arch = flavor_cfg.get("arch", "x86_64")
         out = {
             "aws_regions": c["regions"],
-            "aws_source_ami_name": a["source_ami_name"].replace("{arch}", arch),
+            # {arch} is the EC2 name (x86_64|arm64); {deb_arch} the Debian/Ubuntu name (amd64|arm64) that Canonical's AMI names use.
+            "aws_source_ami_name": a["source_ami_name"].replace("{arch}", arch).replace("{deb_arch}", DEB_ARCH[arch]),
             "aws_source_ami_owner": a["source_ami_owner"],
             "aws_ssh_user": a.get("ssh_user", ""),
             "aws_instance_type": a.get("instance_type") or DEFAULT_BUILD_INSTANCE[arch],

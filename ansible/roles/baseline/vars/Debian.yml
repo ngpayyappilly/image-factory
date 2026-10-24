@@ -1,0 +1,4 @@
+---
+baseline_packages: [auditd, chrony]    # the auditd package is called "audit" on the RHEL family
+baseline_auditd_service: auditd
+baseline_chrony_service: chrony        # the unit is "chronyd" on the RHEL family
