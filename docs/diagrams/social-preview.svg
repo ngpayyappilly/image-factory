@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" font-family="Helvetica, Arial, sans-serif">
+  <rect width="1280" height="640" fill="#0d1117"/>
+  <rect x="0" y="0" width="1280" height="8" fill="#4c8dff"/>
+  <text x="80" y="170" font-size="84" font-weight="700" fill="#ffffff">ImageFactory</text>
+  <text x="80" y="245" font-size="38" fill="#c9d1d9">Build the hardened image once.</text>
+  <text x="80" y="297" font-size="38" fill="#c9d1d9">Prove it. Sign it. Promote that artifact.</text>
+  <g font-size="26" font-weight="600" text-anchor="middle">
+    <rect x="80" y="380" width="150" height="64" rx="10" fill="#1f2937" stroke="#4b5563" stroke-width="2"/><text x="155" y="421" fill="#e5e7eb">Packer</text>
+    <rect x="262" y="380" width="150" height="64" rx="10" fill="#1f2937" stroke="#4b5563" stroke-width="2"/><text x="337" y="421" fill="#e5e7eb">Gates</text>
+    <rect x="444" y="380" width="150" height="64" rx="10" fill="#1f2937" stroke="#4b5563" stroke-width="2"/><text x="519" y="421" fill="#e5e7eb">Sign</text>
+    <rect x="626" y="380" width="150" height="64" rx="10" fill="#0f3d2e" stroke="#34d399" stroke-width="2"/><text x="701" y="421" fill="#a7f3d0">dev</text>
+    <rect x="808" y="380" width="150" height="64" rx="10" fill="#0f3d2e" stroke="#34d399" stroke-width="2"/><text x="883" y="421" fill="#a7f3d0">canary</text>
+    <rect x="990" y="380" width="150" height="64" rx="10" fill="#0f3d2e" stroke="#34d399" stroke-width="2"/><text x="1065" y="421" fill="#a7f3d0">stable</text>
+  </g>
+  <g stroke="#6b7280" stroke-width="3" fill="none"><path d="M232 412h28M414 412h28M596 412h28M778 412h28M960 412h28"/></g>
+  <text x="80" y="540" font-size="28" fill="#9ca3af">AWS, Azure, GCP  |  CIS hardening  |  cosign signed  |  Apache-2.0</text>
+</svg>
