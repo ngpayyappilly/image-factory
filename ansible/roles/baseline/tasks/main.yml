@@ -1,4 +1,8 @@
 ---
+- name: Package and service names for this distribution family
+  ansible.builtin.include_vars:
+    file: "{{ ansible_facts['os_family'] }}.yml"
+
 - name: sshd hardening drop-in
   ansible.builtin.template:
     src: sshd-imagefactory.conf.j2
@@ -41,8 +45,8 @@
     content: "* hard core 0\n"
 
 - name: Install audit and time sync
-  ansible.builtin.dnf:
-    name: [audit, chrony]
+  ansible.builtin.package:
+    name: "{{ baseline_packages }}"
     state: present
 
 - name: Audit rules for identity, sudo and time changes
@@ -60,11 +64,11 @@
       -a always,exit -F arch=b64 -S adjtimex,settimeofday,clock_settime -k time-change
   notify: reload audit rules
 
-- name: Enable auditd and chronyd at boot
+- name: Enable auditd and chrony at boot
   ansible.builtin.service:
     name: "{{ item }}"
     enabled: true
-  loop: [auditd, chronyd]
+  loop: ["{{ baseline_auditd_service }}", "{{ baseline_chrony_service }}"]
 
 - name: Warning banners
   ansible.builtin.copy:

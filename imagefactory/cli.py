@@ -50,6 +50,7 @@ def cmd_packer_vars(a, cfg):
     out = {
         "flavor": a.flavor, "image_version": str(v), "baseline_version": cfg.baseline_version,
         "git_commit": a.commit, "cis_role": img.get("cis_role", ""), "architecture": cfg.arch(a.flavor),
+        "distro_family": cfg.distro_family(a.flavor), "cis_vars": cfg.cis_vars(a.flavor),
     }
     out.update(plat.packer_vars(img, v))
     _print(out)

@@ -1,0 +1,25 @@
+---
+# Overrides for the UBUNTU24-CIS role (ansible-lockdown). Shared by ubuntu2404 and ubuntu2404arm (cis_vars in config).
+# Every override is a documented deviation: say why, and add an entry in config/exceptions.yaml if the compliance gate would
+# otherwise fail. Variable names come from the role's defaults/main/*.yml.
+cis_overrides_loaded: true
+
+# The role has an EC2 switch but does not detect EC2 (it defaults to false). Packer passes packer_builder_type to Ansible, so
+# derive it: amazon-ebs means we are building on EC2.
+system_is_ec2: "{{ (packer_builder_type | default('')) == 'amazon-ebs' }}"
+
+# 5.2.4 "users must provide a password for privilege escalation" rewrites NOPASSWD to PASSWD in /etc/sudoers.d. The role's
+# exclusion list covers ec2-user and vagrant but NOT the cloud image's default user, `ubuntu`, which has passwordless sudo
+# and no password at all (key-only login). Applying it would make the account unusable and break every later `become` task
+# (including the baseline role). It is a Level 2 rule; cloud images keep passwordless sudo for key-based admin and automation.
+ubtu24cis_rule_5_2_4: false
+
+# 4.2.5 outbound allowlist. The role's default permits only 53, 80, 123 and 443 outbound and, once enabled, that policy is baked
+# into the image: every VM launched from it would be unable to reach databases, mail, SSH hops, etc. Outbound policy is a
+# site/application decision (security groups, NACLs), so allow all here. Inbound stays default-deny with OpenSSH allowed
+# (4.2.3/4.2.7): consumers open the ports their application needs at deploy time.
+ubtu24cis_ufw_allow_out_ports: all
+
+# Skip rules the role marks as likely to disrupt a normal workflow (they are applied automatically when true). On a cloud image
+# they cannot sensibly be applied to a running build VM anyway.
+ubtu24cis_disruption_high: false

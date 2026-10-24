@@ -13,6 +13,10 @@ roles:
     src: https://github.com/ansible-lockdown/RHEL9-CIS
     scm: git
     version: 2.4.2
+  - name: UBUNTU24-CIS
+    src: https://github.com/ansible-lockdown/UBUNTU24-CIS
+    scm: git
+    version: 1.8.0
 
 # The roles above call modules from these collections (e.g. community.general.modprobe) and declare them in
 # their own collections/requirements.yml, but ansible-galaxy does not pull collections for a role installed

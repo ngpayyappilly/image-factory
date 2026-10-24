@@ -226,3 +226,59 @@ def test_gate_ingest_fails_loudly_when_evidence_is_missing(local_cfg, tmp_path, 
     assert run("gate-ingest", *build, "--reports", str(empty)) == 1
     out = capsys.readouterr().out
     assert "sbom        PASS" in out and "goss        MISSING" in out
+
+
+# ---- Ubuntu / distro families ----------------------------------------------------------
+
+def test_ubuntu_flavors_use_the_right_architectures_and_platforms(cfg):
+    assert (cfg.arch("ubuntu2404"), cfg.arch("ubuntu2404arm")) == ("x86_64", "arm64")
+    assert cfg.image("ubuntu2404")["platforms"] == ["aws", "azure", "gcp", "vmware"]     # x86_64 everywhere
+    assert cfg.image("ubuntu2404arm")["platforms"] == ["aws"]                            # arm64 is Linux-on-AWS only
+    assert cfg.distro_family("ubuntu2404") == cfg.distro_family("ubuntu2404arm") == "debian"
+    assert cfg.distro_family("rhel9") == cfg.distro_family("al2023arm") == "redhat"
+
+
+def test_ubuntu_ami_names_use_canonicals_arch_names_not_ec2s(cfg):
+    from imagefactory.versioning import Version
+    aws = get_platform("aws", cfg)
+    x86 = aws.packer_vars(cfg.image("ubuntu2404"), Version.parse("ubuntu2404-20261112.1"))
+    arm = aws.packer_vars(cfg.image("ubuntu2404arm"), Version.parse("ubuntu2404arm-20261112.1"))
+    # Canonical names AMIs amd64/arm64 (EC2's x86_64 would match nothing) and 24.04 uses the gp3 storage type.
+    assert x86["aws_source_ami_name"] == "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
+    assert arm["aws_source_ami_name"] == "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*"
+    assert x86["aws_source_ami_owner"] == arm["aws_source_ami_owner"] == "099720109477"       # Canonical
+    assert x86["aws_ssh_user"] == arm["aws_ssh_user"] == "ubuntu"
+    assert (x86["aws_instance_type"], arm["aws_instance_type"]) == ("t3.medium", "t4g.medium")
+    # existing placeholder behaviour is unchanged
+    assert aws.packer_vars(cfg.image("al2023"), Version.parse("al2023-20261112.1"))["aws_source_ami_name"].endswith("-x86_64")
+
+
+def test_packer_vars_carry_the_distro_family_and_cis_vars_name(local_cfg, capsys):
+    run = lambda *a: cli.main(["--config", str(local_cfg), *a])
+    assert run("packer-vars", "--flavor", "ubuntu2404arm", "--platform", "aws", "--version", "ubuntu2404arm-20261112.1") == 0
+    out = json.loads(capsys.readouterr().out)
+    assert (out["distro_family"], out["cis_vars"], out["architecture"], out["cis_role"]) == ("debian", "ubuntu2404", "arm64", "UBUNTU24-CIS")
+    assert run("packer-vars", "--flavor", "al2023arm", "--platform", "aws", "--version", "al2023arm-20261112.1") == 0
+    assert json.loads(capsys.readouterr().out)["cis_vars"] == "al2023"                   # shares the x86_64 flavor's overrides
+
+
+def test_every_flavor_with_a_cis_role_has_an_ansible_vars_file_and_a_pinned_role(cfg):
+    """al2023arm used to have neither: the playbook loads vars/cis_<name>.yml, which did not exist, so it could never have built."""
+    import os
+    import yaml
+    pinned = {r["name"] for r in yaml.safe_load(open("ansible/requirements.yml"))["roles"]}
+    for flavor in cfg.flavors():
+        role = cfg.image(flavor).get("cis_role")
+        if role:
+            assert os.path.exists("ansible/vars/cis_%s.yml" % cfg.cis_vars(flavor)), "%s: no ansible/vars/cis_%s.yml" % (flavor, cfg.cis_vars(flavor))
+            assert role in pinned, "%s: CIS role %s is not pinned in ansible/requirements.yml" % (flavor, role)
+
+
+def test_distro_family_is_validated_for_linux_flavors(tmp_path):
+    with pytest.raises(ConfigError, match="distro_family"):
+        Config.load(_cfg_with(tmp_path, distro_family="slackware", arch="x86_64"))
+
+
+def test_arm64_ubuntu_is_still_rejected_off_aws(tmp_path):
+    with pytest.raises(ConfigError, match="aws only"):
+        Config.load(_cfg_with(tmp_path, distro_family="debian", platforms=["aws", "gcp"], gcp={}))

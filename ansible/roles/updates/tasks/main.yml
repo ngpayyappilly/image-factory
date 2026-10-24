@@ -1,8 +1,12 @@
 ---
-# Hermetic-ish package state: drop the org's pinned mirror repo definitions into
+# RHEL family (Amazon Linux, RHEL): dnf. Debian family (Ubuntu): apt. The family comes from the gathered os_family fact.
+#
+# Hermetic-ish package state on the RHEL family: drop the org's pinned mirror repo definitions into
 # ansible/files/repos/*.repo and they are installed before updating. On Amazon Linux 2023 set
-# distro_releasever (e.g. 2023.6.20250203) to pin to that exact repository snapshot.
-- name: Install org mirror repo definitions
+# distro_releasever (e.g. 2023.6.20250203) to pin to that exact repository snapshot. (Debian-family mirror pinning is not
+# implemented: point /etc/apt/sources.list.d at an internal mirror in the base image, or add a files/apt hook like this one.)
+- name: Install org mirror repo definitions (RHEL family)
+  when: ansible_facts['os_family'] == 'RedHat'
   ansible.builtin.copy:
     src: "{{ item }}"
     dest: /etc/yum.repos.d/{{ item | basename }}
@@ -12,15 +16,33 @@
   with_fileglob:
     - "{{ playbook_dir }}/files/repos/*.repo"
 
-- name: Upgrade all packages
+- name: Upgrade all packages (RHEL family)
+  when: ansible_facts['os_family'] == 'RedHat'
   ansible.builtin.dnf:
     name: "*"
     state: latest
     update_cache: true
     releasever: "{{ distro_releasever if distro_releasever | length > 0 else omit }}"
-  register: pkg_upgrade
+  register: dnf_upgrade
+
+- name: Upgrade all packages (Debian family)
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: dist
+    lock_timeout: 600        # unattended-upgrades commonly holds the dpkg lock for minutes right after first boot
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+    NEEDRESTART_MODE: a      # never prompt to restart services
+  register: apt_upgrade
+
+- name: Is a reboot required (Debian family)
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: reboot_required
 
 - name: Reboot if the kernel or core libraries changed
   ansible.builtin.reboot:
     reboot_timeout: 900
-  when: pkg_upgrade is changed
+  when: (dnf_upgrade is changed) or ((reboot_required.stat | default({})).exists | default(false))

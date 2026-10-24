@@ -1,0 +1,4 @@
+---
+baseline_packages: [audit, chrony]
+baseline_auditd_service: auditd
+baseline_chrony_service: chronyd

@@ -278,7 +278,15 @@ build-time switch:
 | `al2023` | Linux | x86_64 | AWS |
 | `al2023arm` | Linux | arm64 (Graviton) | AWS |
 | `rhel9` | Linux | x86_64 | AWS, Azure, GCP, VMware |
+| `ubuntu2404` | Linux | x86_64 | AWS, Azure, GCP, VMware |
+| `ubuntu2404arm` | Linux | arm64 (Graviton) | AWS |
 | `win2022` | Windows | x86_64 | AWS, Azure (scaffold) |
+
+Linux flavors also carry a **distro family** (`redhat` or `debian`, default `redhat`). It selects the package manager (`dnf` / `apt`), the
+package and service names (`audit`/`chronyd`/`sshd` vs `auditd`/`chrony`/`ssh.socket`), and the file modes the compliance checks expect (`/etc/shadow`
+is `0000` on the RHEL family and `0640 root:shadow` on Ubuntu). The Ansible roles branch on the gathered `os_family` fact; the goss tests are templates
+over `DISTRO_FAMILY`; a unit test renders them for every Linux flavor. `cis_vars` names the `ansible/vars/cis_<name>.yml` overrides, so flavors that
+differ only in architecture share one file.
 
 Because `al2023` and `al2023arm` have different names they have separate versions, manifests, channels and SSM pointers, so a
 consumer cannot resolve the wrong CPU architecture. The `arch` field drives: the source AMI (`{arch}` in the name pattern plus an
