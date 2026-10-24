@@ -242,7 +242,7 @@ def cmd_retention(a, cfg):
 # --- parser -----------------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="imagefactory")
-    p.add_argument("--config", help="path to images.yaml")
+    p.add_argument("--config", help="path to images.yaml (default: $IMAGEFACTORY_CONFIG, else config/images.yaml)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     def add(name, fn, *args, **kw):
