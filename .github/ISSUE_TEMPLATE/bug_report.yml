@@ -1,0 +1,49 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a security problem, do not open an issue: use the private report form in SECURITY.md.
+        Never paste credentials, account IDs you want kept private, or full build logs that contain them.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Commands you ran, from a clean checkout if possible. `make check` failures are easiest to act on.
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Core (imagefactory/ CLI, channels, gates, manifest)
+        - AWS platform
+        - Azure platform
+        - GCP platform
+        - VMware platform
+        - Packer / Ansible / hardening
+        - Terraform
+        - CI workflows
+        - Docs
+    validations:
+      required: true
+  - type: input
+    id: flavor
+    attributes:
+      label: Flavor and platform (if a build is involved)
+      placeholder: ubuntu2404 on aws
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python version, packer / terraform / ansible versions, and the commit you are on.

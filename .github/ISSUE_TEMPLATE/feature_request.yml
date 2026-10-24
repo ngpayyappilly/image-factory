@@ -1,0 +1,21 @@
+name: Feature request
+description: Propose a new flavor, platform capability or pipeline improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+      description: Roughly how it would fit the existing design. Say if it touches an invariant in CLAUDE.md (build once, fail-closed gates, one writer per object).
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contributing
+      options:
+        - label: I would like to implement this myself
