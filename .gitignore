@@ -1,4 +1,5 @@
 .venv/
+.venv-build/
 # Environment-specific config for real runs (account IDs, buckets, subnets, tool pins); see README "Real runs"
 config/*.local.yaml
 config/*.local.yml
@@ -14,3 +15,4 @@ ansible/external/
 *.tfstate*
 *.pkrvars.json
 *.tfvars
+.tools/

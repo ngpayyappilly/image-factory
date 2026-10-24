@@ -242,7 +242,9 @@ promotion; Azure DevOps also takes `build` to serialize build runs (GitHub uses 
 **What the signature covers.** `canonical_bytes()` signs identity and provenance (everything except `gates`,
 `gate_results`, `signature`, `deprecated_at`). Changing which AMIs make up the image invalidates the signature;
 recording a gate result does not. Signing is KMS-backed cosign (`awskms:///alias/imagefactory-signing`), and promotion
-verifies it. Build records are refused once the version has been released.
+verifies it. Signatures are **not** uploaded to the public Sigstore transparency log (`--tlog-upload=false`; verification passes
+`--insecure-ignore-tlog=true`): cosign publishes there by default, which a private pipeline must not do silently, and it would make
+every promotion depend on a third-party service. Trust rests on the KMS key. Build records are refused once the version has been released.
 
 **AWS projection.** For each region: `/imagefactory/<flavor>/<channel>/ami_id` (SSM data type `aws:ec2:image`, so
 `resolve:ssm:` works in launch templates) and `/imagefactory/<flavor>/<channel>/version`. SSM is regional, so every
@@ -345,4 +347,5 @@ flowchart TB
 
 Daily CVE detection, SLO dashboards and alerting, fleet inventory and drift report, catalog integration, the 6-hourly
 availability probe (`smoke_test` is its building block), Git tagging of versions, GCP/VMware runtime plugins, and an
-executed Windows track. Nothing has run against a real AWS account yet.
+executed Windows track. The AWS path has run against a real account once (see the README, "Status"); promotion beyond `dev`, rollback,
+retention and multi-region replication have not.

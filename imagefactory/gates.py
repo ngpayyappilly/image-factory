@@ -80,6 +80,14 @@ def evaluate_sbom(report: dict) -> Result:
     return ("pass", "%d components" % n) if n else ("fail", "SBOM has no components")
 
 
+def _find(d: Path, name: str):
+    """The report `name` directly in `d`, else anywhere below it (Packer's download nests the remote directory name)."""
+    direct = d / name
+    if direct.exists():
+        return direct
+    return next(iter(sorted(d.rglob(name))), None)
+
+
 def ingest(report_dir: Path, cfg) -> Dict[str, Result]:
     """Evaluate every report present; absent reports are simply not recorded (so the gate
     stays unmet and promotion is blocked)."""
@@ -96,8 +104,8 @@ def ingest(report_dir: Path, cfg) -> Dict[str, Result]:
              "secrets": "trivy.json", "sbom": "sbom.json"}
     out = {}
     for gate, fn in plan.items():
-        p = d / files[gate]
-        if not p.exists():
+        p = _find(d, files[gate])
+        if p is None:
             continue
         try:
             out[gate] = fn(_load(p))

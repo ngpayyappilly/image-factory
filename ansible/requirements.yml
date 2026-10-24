@@ -1,6 +1,7 @@
 ---
 # External CIS hardening roles, pinned to reviewed tags. Install with:
-#   ansible-galaxy install -r ansible/requirements.yml -p ansible/external
+#   ansible-galaxy role install       -r ansible/requirements.yml -p ansible/external
+#   ansible-galaxy collection install -r ansible/requirements.yml -p ansible/external   (scripts/build.sh does both)
 # Bump a tag only through a PR that rebuilds the image and passes the compliance gate.
 # Open item: confirm Security's mandated standard; swap these roles if it is not CIS.
 roles:
@@ -12,3 +13,15 @@ roles:
     src: https://github.com/ansible-lockdown/RHEL9-CIS
     scm: git
     version: 2.4.2
+
+# The roles above call modules from these collections (e.g. community.general.modprobe) and declare them in
+# their own collections/requirements.yml, but ansible-galaxy does not pull collections for a role installed
+# from git, so they are pinned here. Versions are chosen to support the pinned ansible-core (see
+# requirements-pip.txt); keep them in step.
+collections:
+  - name: community.general
+    version: 12.6.6
+  - name: community.crypto
+    version: 3.5.1
+  - name: ansible.posix
+    version: 2.2.2

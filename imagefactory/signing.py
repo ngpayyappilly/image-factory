@@ -33,7 +33,11 @@ def sign(m: Manifest, key_ref: str, run: Runner = None) -> str:
     with tempfile.TemporaryDirectory() as d:
         payload, sig = Path(d, "manifest.bin"), Path(d, "manifest.sig")
         payload.write_bytes(m.canonical_bytes())
-        run(["cosign", "sign-blob", "--yes", "--key", key_ref, "--output-signature", str(sig), str(payload)])
+        # Do NOT upload to the public Sigstore transparency log: by default cosign publishes the signature and public key
+        # of every signature, which a private pipeline must not do silently, and it would make every verification
+        # depend on that third-party service. Trust here rests on the KMS key, not on a public log.
+        run(["cosign", "sign-blob", "--yes", "--tlog-upload=false", "--key", key_ref,
+             "--output-signature", str(sig), str(payload)])
         if not sig.exists() or not sig.stat().st_size:
             raise SigningError("cosign produced no signature for %s" % m.version)
         return base64.b64encode(sig.read_bytes()).decode()
@@ -47,4 +51,6 @@ def verify(m: Manifest, key_ref: str, run: Runner = None) -> None:
         payload, sig = Path(d, "manifest.bin"), Path(d, "manifest.sig")
         payload.write_bytes(m.canonical_bytes())
         sig.write_bytes(base64.b64decode(m.signature))
-        run(["cosign", "verify-blob", "--key", key_ref, "--signature", str(sig), str(payload)])
+        # Matches --tlog-upload=false above: there is no log entry to look up, so do not query the public log.
+        run(["cosign", "verify-blob", "--insecure-ignore-tlog=true", "--key", key_ref,
+             "--signature", str(sig), str(payload)])
