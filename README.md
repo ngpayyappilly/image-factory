@@ -194,3 +194,7 @@ found are in [docs/AWS-BOOTSTRAP.md](docs/AWS-BOOTSTRAP.md).
 Not built yet (from the plan): daily CVE detection, SLO dashboards/alerts and structured stage events, fleet
 inventory and drift report, catalog integration, release notes/deprecation calendar tooling, the synthetic
 6-hourly availability probe (`smoke_test` is the building block). See `docs/PLATFORMS.md` for per-platform status.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). By contributing you agree your contribution is licensed under the same terms.
