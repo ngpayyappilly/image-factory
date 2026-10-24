@@ -10,6 +10,9 @@
 # Tools are downloaded from pinned URLs and verified against pinned SHA256s. Missing or
 # unverifiable tooling exits 1 (evidence incomplete), which leaves the gates unmet.
 set -uo pipefail
+# The CIS hardening sets a restrictive default umask (027), and this runs as root while Packer downloads the
+# evidence as the (non-root) build user: create it readable, and make sure of it again before exiting.
+umask 022
 
 R=/tmp/imagefactory-reports
 T=/tmp/imagefactory-tools
@@ -56,4 +59,5 @@ if [ -x "$T/syft" ]; then
 fi
 
 { "$T/goss" --version; "$T/trivy" --version; "$T/syft" --version; } > "$R/tool-versions.txt" 2>&1 || true
+chmod -R a+rX "$R"
 exit $rc

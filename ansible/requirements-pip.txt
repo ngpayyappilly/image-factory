@@ -1,0 +1,4 @@
+# Pinned controller for image builds. The CIS roles require ansible-core >= 2.16.1 (their meta/main.yml), and
+# ansible-core 2.18 needs Python >= 3.11 on the machine running Packer. 2.19 changed templating in ways that can break
+# third-party roles, so stay on 2.18 until the roles are verified on a newer line.
+ansible-core==2.18.19

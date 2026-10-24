@@ -205,3 +205,24 @@ def test_amazon_linux_source_images_pin_the_kernel_stream(cfg):
     for flavor in ("al2023", "al2023arm"):
         name = cfg.image(flavor)["aws"]["source_ami_name"]
         assert "kernel-6.18-{arch}" in name and "kernel-*" not in name
+
+
+def test_gate_ingest_fails_loudly_when_evidence_is_missing(local_cfg, tmp_path, capsys):
+    """A build that produced NO evidence used to exit 0 (nothing to evaluate, nothing failed)."""
+    run = lambda *a: cli.main(["--config", str(local_cfg), *a])
+    pm = tmp_path / "pm.json"
+    pm.write_text(json.dumps({"builds": [{"builder_type": "amazon-ebs", "artifact_id": "us-east-1:ami-1"}]}))
+    build = ["--flavor", "al2023", "--version", "al2023-20261112.1", "--platform", "aws"]
+    run("manifest-create", *build, "--packer-manifest", str(pm), "--commit", "c", "--run-id", "1", "--author", "a")
+    capsys.readouterr()
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    assert run("gate-ingest", *build, "--reports", str(empty)) == 1
+    out = capsys.readouterr().out
+    assert all("%-11s MISSING" % g in out for g in ("goss", "compliance", "vuln_scan", "secrets", "sbom"))
+
+    # Partial evidence: what is present is evaluated, what is absent is named, and the build still fails.
+    (empty / "sbom.json").write_text(json.dumps({"bomFormat": "CycloneDX", "components": [{"name": "x"}]}))
+    assert run("gate-ingest", *build, "--reports", str(empty)) == 1
+    out = capsys.readouterr().out
+    assert "sbom        PASS" in out and "goss        MISSING" in out

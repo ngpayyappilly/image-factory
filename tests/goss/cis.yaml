@@ -39,11 +39,15 @@ command:
   fs-cramfs-disabled:
     meta: {id: cis-fs-cramfs}
     exec: modprobe -n -v cramfs
-    stdout: ["install /bin/false"]
+    exit-status: 0
+    # The CIS role disables modules with `install ... /bin/true`, our baseline with /bin/false: either is disabled.
+    stdout: ["/install .*/bin/(true|false)/"]
   fs-udf-disabled:
     meta: {id: cis-fs-udf}
     exec: modprobe -n -v udf
-    stdout: ["install /bin/false"]
+    exit-status: 0
+    # The CIS role disables modules with `install ... /bin/true`, our baseline with /bin/false: either is disabled.
+    stdout: ["/install .*/bin/(true|false)/"]
 
 kernel-param:
   kernel.randomize_va_space:
@@ -67,16 +71,19 @@ kernel-param:
 
 file:
   /etc/passwd:
+    exists: true
     meta: {id: cis-perm-passwd}
     mode: "0644"
     owner: root
     group: root
   /etc/shadow:
+    exists: true
     meta: {id: cis-perm-shadow}
     mode: "0000"
     owner: root
     group: root
   /etc/group:
+    exists: true
     meta: {id: cis-perm-group}
     mode: "0644"
     owner: root

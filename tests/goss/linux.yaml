@@ -6,7 +6,8 @@ file:
   /etc/imagefactory-release:
     exists: true
     contains:
-      - "IMAGEFACTORY_VERSION=/{{ .Env.FLAVOR }}-[0-9]{8}\\.[0-9]+/"
+      # goss treats a string as a literal unless the WHOLE pattern is wrapped in slashes.
+      - "/^IMAGEFACTORY_VERSION={{ .Env.FLAVOR }}-[0-9]{8}\\.[0-9]+$/"
       - "IMAGEFACTORY_BASELINE="
       - "IMAGEFACTORY_COMMIT="
   # Sealed: machine identity must not ship (regenerated per instance at first boot).
