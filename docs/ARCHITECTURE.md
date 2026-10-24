@@ -354,6 +354,6 @@ flowchart TB
 ## 12. Not built yet
 
 Daily CVE detection, SLO dashboards and alerting, fleet inventory and drift report, catalog integration, the 6-hourly
-availability probe (`smoke_test` is its building block), Git tagging of versions, GCP/VMware runtime plugins, and an
+availability probe (`smoke_test` is its building block), Git tagging of versions, the VMware runtime plugin, real-cloud runs of the Azure and GCP plugins, and an
 executed Windows track. The AWS path has run against a real account once (see the README, "Status"); promotion beyond `dev`, rollback,
 retention and multi-region replication have not.
