@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import os
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -23,7 +24,9 @@ class Config:
 
     @classmethod
     def load(cls, path: Path = None) -> "Config":
-        path = Path(path or DEFAULT_CONFIG)
+        # --config wins, then $IMAGEFACTORY_CONFIG (so scripts/build.sh and CI pick up a local file without new
+        # flags), then the shipped config. Keep account IDs, buckets and subnets in a gitignored local file.
+        path = Path(path or os.environ.get("IMAGEFACTORY_CONFIG") or DEFAULT_CONFIG)
         raw = yaml.safe_load(path.read_text())
         exc_path = path.parent / "exceptions.yaml"
         exceptions = []
